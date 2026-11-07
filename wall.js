@@ -28,6 +28,8 @@
   }
 
   // ---- 头像:2 字节种子 → 144 个调色板索引 ----
+  // 和 card_avatar.c 的 render() 一一对应:只有 5 个自由度(脸色、腮红、
+  // 头顶装饰三选一),其余全是固定笔画,镜像由 11-x 折过去。
   function avatar(seed) {
     var out = new Uint8Array(W * H);
     var s = seed ? (seed >>> 0) : 0x9E3779B9;
@@ -35,10 +37,10 @@
 
     var body = (r & 0x01) ? TEAL : RED;
     var accColor = (body === RED) ? TEAL : RED;
-    var ears = (r & 0x04) !== 0;
     var blush = (r & 0x10) !== 0;
-    var acc = (r >>> 5) & 0x03;
+    var top = (r >>> 5) % 3;
 
+    // 脸体,四个角各切一格
     for (var y = 3; y <= 10; y++) {
       for (var x = 2; x <= 9; x++) put(out, x, y, body);
     }
@@ -47,109 +49,90 @@
     put(out, 2, 10, PAPER);
     put(out, 9, 10, PAPER);
 
+    // 刘海压一行,两侧留鬓角
     for (var fx = 3; fx <= 8; fx++) put(out, fx, 3, INK);
     put(out, 2, 4, INK);
     put(out, 9, 4, INK);
 
-    if (ears) {
-      put(out, 1, 6, body);
-      put(out, 10, 6, body);
+    // 眼睛:2×2,外侧上角留一格当高光
+    for (var dy = 0; dy < 2; dy++) {
+      for (var dx = 0; dx < 2; dx++) {
+        put(out, 3 + dx, 5 + dy, INK);
+        put(out, 8 - dx, 5 + dy, INK);
+      }
     }
-
-    for (var ex = 3; ex <= 7; ex += 4) {
-      put(out, ex, 5, INK);
-      put(out, ex + 1, 5, INK);
-      put(out, ex, 6, INK);
-      put(out, ex + 1, 6, INK);
-      put(out, ex === 3 ? ex : ex + 1, 5, PAPER);
-    }
+    put(out, 3, 5, PAPER);
+    put(out, 8, 5, PAPER);
 
     if (blush) {
       put(out, 3, 7, RED);
       put(out, 8, 7, RED);
     }
 
+    // 嘴:嘴角在上、中间在下,四格拼一个"U"
     put(out, 4, 8, INK);
     put(out, 7, 8, INK);
     put(out, 5, 9, INK);
     put(out, 6, 9, INK);
 
-    switch (acc) {
-    case 1:
+    if (top === 1) {           // 呆毛:贴着发际线
       put(out, 5, 2, INK);
       put(out, 6, 2, INK);
-      break;
-    case 2:
-      put(out, 5, 1, accColor);
-      put(out, 6, 1, accColor);
-      put(out, 4, 2, accColor);
-      put(out, 7, 2, accColor);
-      break;
-    case 3:
+    } else if (top === 2) {    // 天线:一点 + 一杆
       put(out, 4, 1, accColor);
       put(out, 7, 1, accColor);
       put(out, 4, 2, INK);
       put(out, 7, 2, INK);
-      break;
-    default:
-      break;
     }
     return out;
   }
 
-  // 状态装饰:只动眉眼和头顶,和 card_avatar_decorate() 逐格一致。
+  // 状态装饰:和 card_avatar_decorate() 的差量表一一对应。
+  // 每个状态只改四五格,位置固定在眼、嘴、头顶 —— 换的是神情,不是换人。
+  var BODY = -1;
+
+  function sym(x, y, c) { return [[x, y, c], [W - 1 - x, y, c]]; }
+
+  function ops() {
+    var out = [];
+    for (var i = 0; i < arguments.length; i++) out = out.concat(arguments[i]);
+    return out;
+  }
+
+  var PLANS = [
+    // 学习:一条横梁把两只黑眼睛连起来,读成眼镜
+    { ops: ops(sym(5, 5, INK), sym(2, 5, INK), sym(3, 5, INK)), clearTop: false },
+    // 空闲:不装饰
+    { ops: [], clearTop: false },
+    // 别理我:上眼睑压下来,嘴角翻下去
+    { ops: ops(sym(4, 5, BODY), sym(4, 8, BODY), sym(5, 9, BODY),
+               sym(5, 8, INK), sym(4, 9, INK)), clearTop: false },
+    // 组队:头顶红加号
+    { ops: ops(sym(5, 0, RED), sym(4, 1, RED), sym(5, 1, RED), sym(5, 2, RED)), clearTop: true },
+    // 吃饭:嘴角收掉,嘴张成 2×2
+    { ops: ops(sym(4, 8, BODY), sym(5, 8, INK)), clearTop: false },
+    // 运动:右边脸颊一滴汗(只在一边)
+    { ops: [[9, 8, INK], [9, 9, INK]], clearTop: false },
+    // 赶作业:头顶三道焦躁线
+    { ops: [[4, 1, INK], [6, 1, INK], [8, 1, INK]], clearTop: true },
+    // 摸鱼:眼神往上飘
+    { ops: ops(sym(3, 5, INK), sym(3, 6, BODY), sym(4, 6, BODY)), clearTop: false }
+  ];
+
   function decorate(out, status) {
+    if (status < 0 || status >= PLANS.length) return out;
+
+    var plan = PLANS[status];
     var body = out[5 * W + 2];
-    var ex;
-    switch (status & 7) {
-    case 0:   // 学习:眯眼
-      for (ex = 3; ex <= 7; ex += 4) {
-        put(out, ex, 5, body);
-        put(out, ex + 1, 5, body);
-      }
-      break;
-    case 1:   // 空闲:不装饰
-      break;
-    case 2:   // 别理我:眯眼 + 平嘴
-      for (ex = 3; ex <= 7; ex += 4) {
-        put(out, ex, 5, body);
-        put(out, ex + 1, 5, body);
-      }
-      put(out, 4, 8, body);
-      put(out, 7, 8, body);
-      break;
-    case 3:   // 求组队:头顶红加号
+
+    if (plan.clearTop) {
       for (var y = 0; y <= 2; y++) {
         for (var x = 3; x <= 8; x++) put(out, x, y, PAPER);
       }
-      put(out, 5, 0, RED);
-      put(out, 6, 0, RED);
-      for (var xx = 4; xx <= 7; xx++) put(out, xx, 1, RED);
-      put(out, 5, 2, RED);
-      put(out, 6, 2, RED);
-      break;
-    case 4:   // 吃饭:张嘴
-      put(out, 4, 8, body);
-      put(out, 7, 8, body);
-      put(out, 5, 8, INK);
-      put(out, 6, 8, INK);
-      break;
-    case 5:   // 运动:一滴汗
-      put(out, 10, 4, INK);
-      put(out, 10, 5, INK);
-      break;
-    case 6:   // 赶作业:三道焦躁线
-      for (var yy = 0; yy <= 2; yy++) {
-        for (var xxx = 3; xxx <= 8; xxx++) put(out, xxx, yy, PAPER);
-      }
-      put(out, 4, 1, INK);
-      put(out, 6, 1, INK);
-      put(out, 8, 1, INK);
-      break;
-    case 7:   // 摸鱼:眨一只眼
-      put(out, 7, 5, body);
-      put(out, 8, 5, body);
-      break;
+    }
+    for (var i = 0; i < plan.ops.length; i++) {
+      var op = plan.ops[i];
+      put(out, op[0], op[1], op[2] === BODY ? body : op[2]);
     }
     return out;
   }
