@@ -9,86 +9,197 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <style>
   :root {
-    --paper: #F7F4EA; --ink: #24231F; --muted: #6E6A5F;
-    --rule: #DCD5C2; --red: #B5502F; --teal: #2F6F5E; --card: #FFFDF6;
+    --paper: #F4F1E6; --ink: #22211D; --muted: #6E6A5F;
+    --rule: #DFD8C6; --red: #B5502F; --teal: #2F6F5E; --card: #FFFDF7;
+    --shadow: 0 1px 2px rgba(34,33,29,.04), 0 8px 24px rgba(34,33,29,.06);
+    --r: 14px;
+    --cell: 21px;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html { -webkit-text-size-adjust: 100%; }
   body {
-    margin: 0; padding: 14px 14px calc(26px + env(safe-area-inset-bottom));
-    background: var(--paper); color: var(--ink);
-    font: 15px/1.7 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    margin: 0; background: var(--paper); color: var(--ink);
+    font: 15px/1.65 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    overscroll-behavior-y: none;
   }
-  main { max-width: 600px; margin: 0 auto; }
-  h1 { font-size: 21px; margin: 0 0 4px; letter-spacing: .01em; }
-  .sub { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+  button { font-family: inherit; }
+  .app { min-height: 100dvh; display: flex; flex-direction: column; }
+
+  /* ---------------------------------------------------------------- 顶栏 */
+  .topbar {
+    position: sticky; top: 0; z-index: 40;
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: calc(8px + env(safe-area-inset-top)) 14px 8px;
+    background: rgba(244,241,230,.9);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--rule);
+  }
+  .brand { display: flex; align-items: center; gap: 9px; min-width: 0; }
+  .mark {
+    width: 30px; height: 30px; border-radius: 9px; flex: none;
+    background: var(--ink); color: var(--paper);
+    display: grid; place-items: center; font-size: 15px; font-weight: 600;
+  }
+  .brand b { display: block; font-size: 15px; line-height: 1.25; font-weight: 600; }
+  .brand small { display: block; font-size: 11px; color: var(--muted); line-height: 1.3; }
+  .conn { display: flex; align-items: center; gap: 8px; flex: none; }
+
+  /* ---------------------------------------------------------------- 按钮 */
+  .btn {
+    border: 1px solid var(--rule); background: var(--card); color: var(--ink);
+    padding: 11px 16px; border-radius: 11px; font-size: 14px; cursor: pointer;
+    transition: transform .12s, opacity .12s, background .12s; white-space: nowrap;
+  }
+  .btn:active { transform: scale(.97); }
+  .btn.primary { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+  .btn.ghost { background: transparent; }
+  .btn.danger { background: var(--red); border-color: var(--red); color: #fff; }
+  .btn.sm { padding: 8px 13px; font-size: 13px; border-radius: 9px; }
+  .btn:disabled { opacity: .32; cursor: not-allowed; transform: none; }
+
+  /* ---------------------------------------------------------------- 布局 */
+  .shell { flex: 1; display: grid; grid-template-columns: 1fr; min-height: 0; }
+  .content {
+    width: 100%; max-width: 1080px; margin: 0 auto;
+    padding: 12px 12px calc(92px + env(safe-area-inset-bottom));
+  }
+  .sidebar { display: none; }
+
+  .bottomnav {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px;
+    padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
+    background: rgba(255,253,247,.94);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border-top: 1px solid var(--rule);
+  }
+  .navbtn {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    border: 0; background: none; color: var(--muted); font-size: 11px;
+    padding: 6px 2px; border-radius: 10px; cursor: pointer;
+  }
+  .navbtn svg {
+    width: 20px; height: 20px; stroke: currentColor; fill: none;
+    stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;
+  }
+  .navbtn.on { color: var(--ink); background: rgba(34,33,29,.05); }
+
+  @media (min-width: 900px) {
+    .shell { grid-template-columns: 212px 1fr; }
+    .sidebar {
+      display: flex; flex-direction: column; gap: 3px;
+      padding: 16px 10px; position: sticky; top: 53px; align-self: start;
+    }
+    .sidebar .navbtn {
+      flex-direction: row; gap: 10px; font-size: 14px; padding: 10px 12px;
+      border-radius: 10px;
+    }
+    .sidebar .navbtn.on { background: var(--card); box-shadow: var(--shadow); }
+    .bottomnav { display: none; }
+    .content { padding: 18px 22px 28px; }
+  }
+
+  /* ---------------------------------------------------------------- 分页 */
+  .panel { display: none; }
+  .panel.on { display: block; animation: fade .18s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  .panelhead {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 10px; margin: 4px 2px 10px;
+  }
+  .panelhead h2 { font-size: 19px; margin: 0; font-weight: 600; letter-spacing: .01em; }
+  .pill {
+    font-size: 12px; color: var(--muted); background: rgba(34,33,29,.05);
+    padding: 3px 9px; border-radius: 999px; white-space: nowrap;
+  }
+
   .card {
-    background: var(--card); border-radius: 12px;
-    padding: 14px; margin: 0 0 10px;
+    background: var(--card); border-radius: var(--r);
+    padding: 14px; margin: 0 0 12px; box-shadow: var(--shadow);
   }
-  h2 { font-size: 14px; margin: 0 0 10px; font-weight: 500; }
+  .card h3 { font-size: 13px; font-weight: 600; margin: 0 0 10px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+  .card > .row:first-of-type { margin-top: 0; }
+  .hint { color: var(--muted); font-size: 12px; margin: 8px 0 0; }
+  .status { font-size: 12px; color: var(--muted); }
+  .dot {
+    display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+    background: #C9C2AF; margin-right: 5px; vertical-align: middle; transition: .2s;
+  }
+  .dot.on { background: var(--teal); box-shadow: 0 0 0 3px rgba(47,111,94,.16); }
+  .bar { height: 4px; background: var(--rule); border-radius: 2px; overflow: hidden; margin-top: 10px; }
+  .bar > i { display: block; height: 100%; width: 0; background: var(--red); transition: width .15s; }
+
+  /* ---------------------------------------------------------------- 同步条 */
+  .syncbar { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; }
+  .syncbar .t b { display: block; font-size: 14px; }
+  .syncbar .t span { font-size: 12px; color: var(--muted); }
+  .syncbar .bar, .syncbar .hint { grid-column: 1 / -1; }
+  .syncbar .hint { margin: 0; }
+  @media (max-width: 420px) {
+    .syncbar { grid-template-columns: 1fr; }
+    .syncbar .btn { width: 100%; }
+  }
+
+  /* ---------------------------------------------------------------- 相册 */
+  .meter { height: 6px; border-radius: 999px; background: var(--rule); overflow: hidden; margin: 0 2px 14px; }
+  .meter > i { display: block; height: 100%; width: 0; background: var(--teal); border-radius: 999px; transition: width .3s; }
+  .albumwrap { display: grid; grid-template-columns: 132px 1fr; gap: 14px; align-items: start; }
+  .albpreview {
+    position: relative; border-radius: 10px; overflow: hidden; background: #14130F;
+    aspect-ratio: 3 / 4; border: 1px solid var(--rule); cursor: pointer;
+  }
+  .albpreview canvas { width: 100%; height: 100%; display: block; }
+  .albpreview.over { outline: 2px dashed var(--teal); outline-offset: 2px; }
+  .dropmask {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 4px; text-align: center;
+    color: #fff; background: rgba(34,33,29,.55); font-size: 12px; padding: 8px;
+  }
+  .dropmask small { font-size: 10px; opacity: .75; }
+  .dropmask.hide { display: none; }
+  .albctrl { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .albctrl .btn { width: 100%; white-space: normal; }
+  @media (min-width: 700px) { .albumwrap { grid-template-columns: 200px 1fr; } }
+  @media (min-width: 1100px) { .albumwrap { grid-template-columns: 220px 1fr; } }
+
+  .slothead {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 10px; margin: 16px 2px 8px;
+  }
+  .slothead b { font-size: 13px; }
+  .slothead span { font-size: 11px; color: var(--muted); }
+  .slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(48px, 1fr)); gap: 7px; }
+  .slot {
+    position: relative; aspect-ratio: 3 / 4; border-radius: 8px;
+    border: 1px dashed var(--rule); background: rgba(255,255,255,.45);
+    color: #B9B2A0; font-size: 11px; display: grid; place-items: center;
+  }
+  .slot.full {
+    border: 1px solid transparent; color: #EDE7D8; cursor: pointer;
+    background: linear-gradient(160deg, #3A3833, #22211D);
+  }
+  .slot.full::after {
+    content: ''; position: absolute; inset: 0; border-radius: 8px;
+    background: radial-gradient(circle at 30% 25%, rgba(255,255,255,.18), transparent 60%);
+  }
+  .slot.sel { outline: 2px solid var(--red); outline-offset: 2px; }
+  .delbar {
+    display: flex; align-items: center; gap: 8px; margin-top: 12px;
+    padding: 10px 12px; border-radius: 11px;
+    background: #FBF0EC; border: 1px solid rgba(181,80,47,.25);
+  }
+  .delbar[hidden] { display: none; }
+  .delbar span { flex: 1; font-size: 13px; color: var(--red); }
+
+  /* ---------------------------------------------------------------- 表单 */
   textarea {
     width: 100%; border: 1px solid var(--rule); border-radius: 10px;
     background: #fff; color: var(--ink); padding: 10px;
     font: 13px/1.6 ui-monospace, "SF Mono", Menlo, monospace;
     min-height: 140px; resize: vertical;
   }
-  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
-  .card > .row:first-of-type { margin-top: 0; }
-  button {
-    border: 1px solid var(--ink); background: var(--ink); color: var(--paper);
-    padding: 10px 15px; border-radius: 11px; font-size: 14px;
-    cursor: pointer; font-family: inherit;
-  }
-  button.ghost { background: transparent; color: var(--ink); }
-  button.big { width: 100%; padding: 14px; font-size: 16px; border-radius: 13px; }
-  /* 远程控制:一个遥控器。三列,演示时一屏就能看全,不用滚。 */
-  .rcmd { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
-  .rcmd button { padding: 9px 4px; font-size: 13px; border-radius: 10px; }
-  button:disabled { opacity: .34; cursor: not-allowed; }
-  .hint { color: var(--muted); font-size: 12px; margin: 10px 0 0; opacity: .9; }
-  .status { font-size: 13px; color: var(--muted); }
-  .dot {
-    display: inline-block; width: 8px; height: 8px; border-radius: 50%;
-    background: var(--rule); margin-right: 6px; vertical-align: middle;
-  }
-  .dot.on { background: var(--teal); }
-  .bar { height: 3px; background: var(--rule); border-radius: 2px; overflow: hidden; margin-top: 10px; }
-  .bar > i { display: block; height: 100%; width: 0; background: var(--red); transition: width .15s; }
-  ul.todo { list-style: none; padding: 0; margin: 0; }
-  ul.todo li { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
-  ul.todo input { width: 20px; height: 20px; accent-color: var(--red); }
-  #log:empty { display: none; }
-  #log {
-    font: 12px/1.65 ui-monospace, "SF Mono", Menlo, monospace;
-    background: #2A2925; color: #E8E2D4; border-radius: 12px;
-    padding: 10px 12px; max-height: 170px; overflow: auto; white-space: pre-wrap;
-  }
-  .warn {
-    border: 1px solid var(--red); color: var(--red); background: #FBF0EC;
-    border-radius: 11px; padding: 10px 12px; font-size: 13px; margin-bottom: 12px;
-  }
-  details { margin-top: 8px; }
-  summary { cursor: pointer; color: var(--muted); font-size: 13px; }
-  details p { color: var(--muted); font-size: 13px; margin: 8px 0 0; }
-  code { background: #F0EBDD; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
-
-  /* 名片墙:四列,一屏能看全 16 个人。每格是一张当场画出来的 canvas。 */
-  .wallgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 9px; margin-top: 12px; }
-  .wallcell { text-align: center; }
-  .wallcell canvas {
-    width: 100%; height: auto; display: block; border-radius: 9px;
-    background: var(--paper); image-rendering: pixelated;
-  }
-  .wallcell.empty canvas {
-    background: #F4F0E4;
-    box-shadow: inset 0 0 0 1px var(--rule);
-  }
-  .wallcell b { display: block; font-size: 12px; font-weight: 500; margin-top: 4px; }
-  .wallcell span { display: block; font-size: 10px; color: var(--muted); line-height: 1.45; }
-  .wallmet { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
-  .wallmet b { color: var(--ink); font-weight: 600; }
-
-  .fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(148px, 1fr)); gap: 10px; margin-top: 4px; }
+  .fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
   .fields label { display: block; font-size: 12px; color: var(--muted); }
   .fields input {
     width: 100%; margin-top: 4px; padding: 10px 12px;
@@ -97,7 +208,6 @@
   }
   .fields input:focus { outline: 2px solid var(--teal); outline-offset: -1px; }
 
-  /* 课表 / 饭表:表格而不是文本框。底层还是同一批帧,只是不让人手打 CSV。 */
   .grid { display: grid; grid-template-columns: 20px 1fr 1fr 1.25fr; gap: 6px 7px; align-items: center; }
   .grid.meal { grid-template-columns: 32px 1fr 1fr 1fr; }
   .grid .gh { font-size: 11px; color: var(--muted); padding-bottom: 2px; }
@@ -111,7 +221,10 @@
   .grid input:focus, .grid select:focus { outline: 2px solid var(--teal); outline-offset: -1px; }
   .grid input::placeholder { color: #BDB6A4; }
 
-  /* 周末课表收在折叠里:一周五天已经占满一屏,周末不该把页面再拉长一节。 */
+  details { margin-top: 8px; }
+  summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+  details p { color: var(--muted); font-size: 13px; margin: 8px 0 0; }
+  code { background: #F0EBDD; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
   details.wk { margin-top: 12px; }
   details.wk summary {
     cursor: pointer; font-size: 13px; color: var(--muted);
@@ -122,275 +235,412 @@
   details.wk[open] summary::before { content: '－ '; }
   details.wk .grid { margin-top: 6px; }
 
-  /* 首页背景:左边一块 240×320 的等比预览,右边几个控件。 */
+  ul.todo { list-style: none; padding: 0; margin: 0; }
+  ul.todo li { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
+  ul.todo input { width: 20px; height: 20px; accent-color: var(--red); }
+
+  /* ---------------------------------------------------------------- 首页背景 */
   .bgrow { display: grid; grid-template-columns: 120px 1fr; gap: 12px; align-items: start; }
-  .bgprev { position: relative; width: 120px; height: 160px; border-radius: 8px;
-            overflow: hidden; border: 1px solid var(--rule); background: var(--paper); }
+  .bgprev {
+    position: relative; width: 120px; height: 160px; border-radius: 8px;
+    overflow: hidden; border: 1px solid var(--rule); background: var(--paper);
+  }
   .bgprev canvas { width: 120px; height: 160px; display: block; }
-  .bgtext { position: absolute; inset: 0; display: flex; flex-direction: column;
-            align-items: center; justify-content: center; gap: 3px; color: #24231F; }
+  .bgtext {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 3px; color: #24231F;
+  }
   .bgtext b { font-size: 19px; letter-spacing: -.5px; }
   .bgtext span { font-size: 11px; font-weight: 600; }
   .bgtext em { font-size: 10px; font-style: normal; opacity: .75; }
   .bgctl { display: flex; flex-direction: column; gap: 6px; }
-  .bgctl button { padding: 7px 10px; font-size: 13px; }
+  .bgctl .btn { padding: 8px 10px; font-size: 13px; }
   .bglabel { font-size: 12px; color: var(--muted); }
   .bglabel b { color: var(--ink); font-weight: 600; }
   .bgctl input[type=range] { width: 100%; margin: 0; }
 
-  /* 相册:预览还是 240×320,只是显示得小一半。删照片那一行要横着排。 */
-  .albdel { display: flex; gap: 6px; align-items: center; }
-  .albdel input { width: 58px; padding: 6px 8px; font-size: 13px;
-                  border: 1px solid var(--rule); border-radius: 8px; background: var(--paper); color: var(--ink); }
-  .albdel button { flex: 1; }
-
-  /* 电脑上把卡片排成两列:词表、课表这些长文本本来就该用大屏编辑。 */
-  @media (min-width: 940px) {
-    main { max-width: 1120px; display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px; align-items: start; }
-    main > h1, main > .sub, main > #unsupported,
-    main > #log, main > details { grid-column: 1 / -1; }
+  /* ---------------------------------------------------------------- 名片墙 */
+  .wallgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 9px; margin-top: 12px; }
+  .wallcell { text-align: center; }
+  .wallcell canvas {
+    width: 100%; height: auto; display: block; border-radius: 9px;
+    background: var(--paper); image-rendering: pixelated;
   }
+  .wallcell.empty canvas { background: #F4F0E4; box-shadow: inset 0 0 0 1px var(--rule); }
+  .wallcell b { display: block; font-size: 12px; font-weight: 500; margin-top: 4px; }
+  .wallcell span { display: block; font-size: 10px; color: var(--muted); line-height: 1.45; }
+  .wallmet { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+  .wallmet b { color: var(--ink); font-weight: 600; }
 
-  /* 手绘卡面:12×12 拼豆 */
+  /* ---------------------------------------------------------------- 远程控制 */
+  .rcmd { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+  .rcmd .btn { padding: 9px 4px; font-size: 12.5px; border-radius: 9px; }
+
+  /* ---------------------------------------------------------------- 手绘卡面 */
   .face-wrap { display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
   .face-grid {
-    display: grid; grid-template-columns: repeat(12, 21px); gap: 1px;
+    display: grid; grid-template-columns: repeat(12, var(--cell)); gap: 1px;
     background: #d8cfb4; padding: 3px; border-radius: 6px;
     touch-action: none; user-select: none;
   }
-  .face-grid i { width: 21px; height: 21px; display: block; border-radius: 2px;
-    box-shadow: inset 0 0 0 1px rgba(36,35,31,.07); }
+  .face-grid i {
+    width: var(--cell); height: var(--cell); display: block; border-radius: 2px;
+    box-shadow: inset 0 0 0 1px rgba(36,35,31,.07);
+  }
   .face-pal { display: flex; flex-direction: column; gap: 8px; }
   .face-pal button {
     width: 40px; height: 40px; border-radius: 10px; border: 2px solid transparent;
     padding: 0; cursor: pointer;
   }
   .face-pal button.on { border-color: #2f6f5e; box-shadow: 0 0 0 2px rgba(47,111,94,.25); }
+  @media (max-width: 359px) { :root { --cell: 18px; } }
+  @media (max-width: 380px) {
+    .brand small { display: none; }
+    .btn.sm { padding: 7px 10px; font-size: 12px; }
+    .conn { gap: 6px; }
+  }
+
+  /* ---------------------------------------------------------------- 日志 / 提示 */
+  #log:empty { display: none; }
+  #log {
+    font: 12px/1.65 ui-monospace, "SF Mono", Menlo, monospace;
+    background: #2A2925; color: #E8E2D4; border-radius: 12px;
+    padding: 10px 12px; max-height: 170px; overflow: auto; white-space: pre-wrap;
+    margin-top: 12px;
+  }
+  .warn {
+    border: 1px solid var(--red); color: var(--red); background: #FBF0EC;
+    border-radius: 11px; padding: 10px 12px; font-size: 13px; margin: 10px 12px 0;
+  }
 </style>
 </head>
 <body>
-<main>
-  <h1>校园卡</h1>
-  <p class="sub">不装 App，用浏览器改卡上的东西。</p>
+<div class="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="mark">卡</span>
+      <div><b>校园卡</b><small>浏览器直连 · 不装 App</small></div>
+    </div>
+    <div class="conn">
+      <span class="status"><span class="dot" id="dot"></span><span id="cstate">未连接</span></span>
+      <button id="connect" class="btn primary sm">连接</button>
+      <button id="disconnect" class="btn ghost sm" disabled>断开</button>
+    </div>
+  </header>
 
   <div id="unsupported" class="warn" hidden>
     这个浏览器没有 Web Bluetooth。Android 用 Chrome，iPhone 用 Bluefy。
   </div>
 
-  <div class="card">
-    <h2>连接卡片</h2>
-    <div class="row">
-      <button id="connect">连接卡片</button>
-      <button id="disconnect" class="ghost" disabled>断开</button>
-      <span class="status"><span class="dot" id="dot"></span><span id="cstate">未连接</span></span>
-    </div>
-    <div class="row">
-      <button id="sendAll" class="big" disabled>全部写进卡片</button>
-    </div>
-    <div class="bar"><i id="allbar"></i></div>
-    <p class="hint">卡片上：菜单 → 工具 → <b>连设备</b>，屏幕出现二维码后回来连。</p>
-  </div>
+  <div class="shell">
+    <nav class="sidebar">
+      <button class="navbtn on" data-tab="album">
+        <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="8.5" cy="9.5" r="1.6"/><path d="M4 17l4.5-4.5 3 3L15 12l5 5"/></svg>
+        相册
+      </button>
+      <button class="navbtn" data-tab="card">
+        <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2.5"/><circle cx="8.5" cy="11" r="1.8"/><path d="M5.5 16c.6-1.6 1.6-2.4 3-2.4s2.4.8 3 2.4M14 10h4M14 13.5h3"/></svg>
+        卡片
+      </button>
+      <button class="navbtn" data-tab="study">
+        <svg viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 016.5 3H19v16H6.5A2.5 2.5 0 004 21.5z"/><path d="M4 18.5A2.5 2.5 0 016.5 16H19"/></svg>
+        学习
+      </button>
+      <button class="navbtn" data-tab="wall">
+        <svg viewBox="0 0 24 24"><circle cx="9" cy="8.5" r="3"/><path d="M3.5 19c.7-3 2.7-4.6 5.5-4.6s4.8 1.6 5.5 4.6"/><circle cx="17" cy="9.5" r="2.2"/><path d="M15 19c.3-2 1.4-3.3 3-3.6"/></svg>
+        名片墙
+      </button>
+      <button class="navbtn" data-tab="more">
+        <svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="18" cy="12" r="1.4"/></svg>
+        更多
+      </button>
+    </nav>
 
-  <div class="card">
-    <h2>演示预设</h2>
-    <p class="hint">一键填好姓名、课表（含周六日）、饭表、词表和待办，再点上面的「全部写进卡片」。</p>
-    <div class="row">
-      <button id="fillPreset" class="big">填入演示预设</button>
-      <span class="status" id="presetState"></span>
-    </div>
-  </div>
+    <main class="content">
 
-  <div class="card">
-    <h2>远程控制</h2>
-    <p class="hint">电脑或手机点一下，卡片就执行——演示时不用站在设备旁边。</p>
-    <div class="rcmd" id="remoteGrid"></div>
-    <div class="row">
-      <button id="voiceBtn" class="ghost" disabled>🎤 说一句</button>
-      <span class="status" id="voiceState">例如：打开课表 / 番茄钟二十五分钟</span>
-    </div>
-  </div>
+      <section class="card syncbar">
+        <div class="t">
+          <b>全部写进卡片</b>
+          <span>姓名、词表、课表、饭表、待办，一次写完</span>
+        </div>
+        <button id="sendAll" class="btn primary" disabled>全部写进卡片</button>
+        <div class="bar"><i id="allbar"></i></div>
+        <p class="hint">卡片上：菜单 → 工具 → 连设备，屏幕出现二维码后回来连。</p>
+      </section>
 
-  <div class="card">
-    <h2>个人信息</h2>
-    <div class="fields">
-      <label>姓名<input id="pname" maxlength="12" placeholder="林小满" autocomplete="off"></label>
-      <label>班级<input id="pclass" maxlength="15" placeholder="高二(3)班" autocomplete="off"></label>
-      <label>学号<input id="pno" maxlength="10" placeholder="0421" autocomplete="off"></label>
-      <label>口号<input id="pslogan" maxlength="18" placeholder="今天也要加油" autocomplete="off"></label>
-    </div>
-    <div class="row">
-      <button id="sendProfile" disabled>写进卡里</button>
-      <span class="status" id="pstate"></span>
-    </div>
-  </div>
+      <!-- ------------------------------------------------------------ 相册 -->
+      <section class="panel on" data-panel="album">
+        <div class="panelhead">
+          <h2>相册</h2>
+          <span class="pill" id="albMeta">—</span>
+        </div>
+        <div class="meter"><i id="albMeter"></i></div>
 
-  <div class="card">
-    <h2>词表</h2>
-    <textarea id="words" spellcheck="false" placeholder="每行一个词，英文和释义用逗号或空格隔开：
+        <div class="albumwrap">
+          <div class="albpreview" id="albPreview">
+            <canvas id="albCanvas" width="240" height="320"></canvas>
+            <div class="dropmask" id="albDrop">拖照片到这里<small>或点下方按钮选图</small></div>
+          </div>
+          <div class="albctrl">
+            <button id="albPick" class="btn primary">选一张照片</button>
+            <input type="file" id="albFile" accept="image/*" hidden>
+            <button id="albSend" class="btn" disabled>写进卡片</button>
+            <div class="bar"><i id="albBar"></i></div>
+            <p class="hint" id="albHint">全彩 240×320，一张 150 KB。卡片最多存 31 张，满了拒收，不会挤掉旧照片。</p>
+            <button id="albRefresh" class="btn ghost sm" disabled>读取卡片</button>
+          </div>
+        </div>
+
+        <div class="slothead">
+          <b>卡片里的照片</b>
+          <span id="albSlotHint">点一格选中，再确认删除</span>
+        </div>
+        <div class="slots" id="albSlots"></div>
+
+        <div class="delbar" id="albDelBar" hidden>
+          <span id="albDelText">删除第 1 张？</span>
+          <button id="albDel" class="btn danger sm" disabled>删除</button>
+          <button id="albCancel" class="btn ghost sm">取消</button>
+        </div>
+        <input id="albDelNo" type="number" min="1" value="1" hidden>
+      </section>
+
+      <!-- ------------------------------------------------------------ 卡片 -->
+      <section class="panel" data-panel="card">
+        <div class="panelhead">
+          <h2>卡片</h2>
+          <span class="pill">姓名 · 脸 · 背景</span>
+        </div>
+
+        <div class="card">
+          <h3>个人信息</h3>
+          <div class="fields">
+            <label>姓名<input id="pname" maxlength="12" placeholder="林小满" autocomplete="off"></label>
+            <label>班级<input id="pclass" maxlength="15" placeholder="高二(3)班" autocomplete="off"></label>
+            <label>学号<input id="pno" maxlength="10" placeholder="0421" autocomplete="off"></label>
+            <label>口号<input id="pslogan" maxlength="18" placeholder="今天也要加油" autocomplete="off"></label>
+          </div>
+          <div class="row">
+            <button id="sendProfile" class="btn" disabled>写进卡里</button>
+            <span class="status" id="pstate"></span>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>手绘卡面</h3>
+          <p class="hint" style="margin-top:0">点一下上色，按住可以拖着涂。</p>
+          <div class="face-wrap">
+            <div id="faceGrid" class="face-grid"></div>
+            <div class="face-pal" id="facePal">
+              <button data-c="1" style="background:#24231F"></button>
+              <button data-c="2" style="background:#B5502F"></button>
+              <button data-c="3" style="background:#2F6F5E"></button>
+              <button data-c="0" style="background:#DCD1B2"></button>
+            </div>
+          </div>
+          <div class="row">
+            <button id="sendFace" class="btn" disabled>发到卡片</button>
+            <button id="clearFace" class="btn ghost">清空画布</button>
+          </div>
+        </div>
+
+        <div class="card" id="bgCard">
+          <h3>首页背景</h3>
+          <div class="bgrow">
+            <div class="bgprev">
+              <canvas id="bgCanvas" width="240" height="320"></canvas>
+              <div class="bgtext"><b>9:41</b><span>林小满</span><em>空闲</em></div>
+            </div>
+            <div class="bgctl">
+              <button id="bgPick" class="btn ghost">选一张图片</button>
+              <input type="file" id="bgFile" accept="image/*" hidden>
+              <label class="bglabel">暗部墨点上限 <b id="bgInk">—</b></label>
+              <input type="range" id="bgCover" min="15" max="75" step="1" value="55">
+              <button id="bgSend" class="btn" disabled>写进卡片</button>
+              <button id="bgClear" class="btn ghost" disabled>去掉背景</button>
+              <div class="bar"><i id="bgBar"></i></div>
+            </div>
+          </div>
+          <p class="hint">照片会变成黑白网点。墨点越多越像照片，字越难认。</p>
+        </div>
+      </section>
+
+      <!-- ------------------------------------------------------------ 学习 -->
+      <section class="panel" data-panel="study">
+        <div class="panelhead">
+          <h2>学习</h2>
+          <span class="pill">词表 · 课表 · 饭表 · 待办</span>
+        </div>
+
+        <div class="card">
+          <h3>词表</h3>
+          <textarea id="words" spellcheck="false" placeholder="每行一个词，英文和释义用逗号或空格隔开：
 apple,苹果
 anchor,n. 锚；支柱
 subtle,微妙的"></textarea>
-    <div class="row">
-      <input type="file" id="file" accept=".txt,.csv,text/plain" style="display:none">
-      <button id="pick" class="ghost">读入 txt / csv</button>
-      <button id="sendWords" disabled>只发词表</button>
-      <span class="status" id="wordCount">0 个词</span>
-    </div>
-    <div class="bar"><i id="wbar"></i></div>
-    <p class="hint">最多 60 个词，内容自动保存。</p>
-  </div>
-
-  <div class="card">
-    <h2>课表</h2>
-    <div class="grid" id="periodGrid">
-      <div class="gh">#</div><div class="gh">开始</div><div class="gh">结束</div><div class="gh">课程</div>
-    </div>
-    <details class="wk">
-      <summary>周六课表</summary>
-      <div class="grid" id="satGrid">
-        <div class="gh">#</div><div class="gh">开始</div><div class="gh">结束</div><div class="gh">课程</div>
-      </div>
-    </details>
-    <details class="wk">
-      <summary>周日课表</summary>
-      <div class="grid" id="sunGrid">
-        <div class="gh">#</div><div class="gh">开始</div><div class="gh">结束</div><div class="gh">课程</div>
-      </div>
-    </details>
-    <div class="row">
-      <button id="sendPeriods" disabled>只发课表</button>
-      <span class="status" id="periodCount">0 节</span>
-    </div>
-    <p class="hint">周一到周五共用上面那张；周六、周日各一张。开始时间留空就是这节课没有。</p>
-  </div>
-
-  <div class="card">
-    <h2>饭表</h2>
-    <div class="grid meal" id="mealGrid">
-      <div class="gh">周</div><div class="gh">早</div><div class="gh">午</div><div class="gh">晚</div>
-    </div>
-    <div class="row">
-      <button id="sendMeals" disabled>只发饭表</button>
-      <button id="clearMeals" class="ghost" disabled>清空饭表</button>
-      <span class="status" id="mealCount">0 顿</span>
-    </div>
-    <p class="hint">只发填了的格子，没填的在卡上保持原样。</p>
-  </div>
-
-  <div class="card">
-    <h2>待办</h2>
-    <div class="row" style="align-items:center;gap:10px">
-      <button class="ghost" id="todoMinus" style="width:48px">−</button>
-      <b id="todoCount" style="font-size:26px;min-width:2.4em;text-align:center">0</b>
-      <button class="ghost" id="todoPlus" style="width:48px">＋</button>
-      <span class="status">件</span>
-    </div>
-    <div class="row">
-      <button id="sendTodo" disabled>只发待办</button>
-    </div>
-  </div>
-
-  <div class="card">
-    <h2>手绘卡面</h2>
-    <p class="hint">点一下上色，按住可以拖着涂。</p>
-    <div class="face-wrap">
-      <div id="faceGrid" class="face-grid"></div>
-      <div class="face-pal" id="facePal">
-        <button data-c="1" style="background:#24231F"></button>
-        <button data-c="2" style="background:#B5502F"></button>
-        <button data-c="3" style="background:#2F6F5E"></button>
-        <button data-c="0" style="background:#DCD1B2"></button>
-      </div>
-    </div>
-    <div class="row" style="margin-top:10px">
-      <button id="sendFace" disabled>发到卡片</button>
-      <button id="clearFace" class="ghost">清空画布</button>
-    </div>
-  </div>
-
-  <div class="card" id="bgCard">
-    <h2>首页背景</h2>
-    <div class="bgrow">
-      <div class="bgprev">
-        <canvas id="bgCanvas" width="240" height="320"></canvas>
-        <!-- 叠一层真的文字:不然看不出"这张图会不会把字压没" -->
-        <div class="bgtext"><b>9:41</b><span>林小满</span><em>空闲</em></div>
-      </div>
-      <div class="bgctl">
-        <button id="bgPick" class="ghost">选一张图片</button>
-        <input type="file" id="bgFile" accept="image/*" hidden>
-        <label class="bglabel">暗部墨点上限 <b id="bgInk">—</b></label>
-        <input type="range" id="bgCover" min="15" max="75" step="1" value="55">
-        <button id="bgSend" disabled>写进卡片</button>
-        <button id="bgClear" class="ghost" disabled>去掉背景</button>
-        <div class="bar"><i id="bgBar"></i></div>
-      </div>
-    </div>
-    <p class="hint">照片会变成黑白网点。墨点越多越像照片，字越难认。</p>
-  </div>
-
-  <div class="card" id="albumCard">
-    <h2>相册</h2>
-    <div class="bgrow">
-      <div class="bgprev"><canvas id="albCanvas" width="240" height="320"></canvas></div>
-      <div class="bgctl">
-        <button id="albPick" class="ghost">选一张照片</button>
-        <input type="file" id="albFile" accept="image/*" hidden>
-        <label class="bglabel">卡片里 <b id="albMeta">—</b></label>
-        <button id="albSend" disabled>写进卡片</button>
-        <div class="albdel">
-          <input id="albDelNo" type="number" min="1" value="1" inputmode="numeric">
-          <button id="albDel" class="ghost" disabled>删掉这张</button>
+          <div class="row">
+            <input type="file" id="file" accept=".txt,.csv,text/plain" style="display:none">
+            <button id="pick" class="btn ghost">读入 txt / csv</button>
+            <button id="sendWords" class="btn" disabled>只发词表</button>
+            <span class="status" id="wordCount">0 个词</span>
+          </div>
+          <div class="bar"><i id="wbar"></i></div>
+          <p class="hint">最多 60 个词，内容自动保存。</p>
         </div>
-        <button id="albRefresh" class="ghost" disabled>读一下卡片</button>
-        <div class="bar"><i id="albBar"></i></div>
-      </div>
-    </div>
-    <p class="hint" id="albHint">全彩 240×320。卡片最多存 31 张，一张 150 KB，满了会拒收 —— 不会挤掉旧照片。</p>
+
+        <div class="card">
+          <h3>课表</h3>
+          <div class="grid" id="periodGrid">
+            <div class="gh">#</div><div class="gh">开始</div><div class="gh">结束</div><div class="gh">课程</div>
+          </div>
+          <details class="wk">
+            <summary>周六课表</summary>
+            <div class="grid" id="satGrid">
+              <div class="gh">#</div><div class="gh">开始</div><div class="gh">结束</div><div class="gh">课程</div>
+            </div>
+          </details>
+          <details class="wk">
+            <summary>周日课表</summary>
+            <div class="grid" id="sunGrid">
+              <div class="gh">#</div><div class="gh">开始</div><div class="gh">结束</div><div class="gh">课程</div>
+            </div>
+          </details>
+          <div class="row">
+            <button id="sendPeriods" class="btn" disabled>只发课表</button>
+            <span class="status" id="periodCount">0 节</span>
+          </div>
+          <p class="hint">周一到周五共用上面那张；周六、周日各一张。开始时间留空就是这节课没有。</p>
+        </div>
+
+        <div class="card">
+          <h3>饭表</h3>
+          <div class="grid meal" id="mealGrid">
+            <div class="gh">周</div><div class="gh">早</div><div class="gh">午</div><div class="gh">晚</div>
+          </div>
+          <div class="row">
+            <button id="sendMeals" class="btn" disabled>只发饭表</button>
+            <button id="clearMeals" class="btn ghost" disabled>清空饭表</button>
+            <span class="status" id="mealCount">0 顿</span>
+          </div>
+          <p class="hint">只发填了的格子，没填的在卡上保持原样。</p>
+        </div>
+
+        <div class="card">
+          <h3>待办</h3>
+          <div class="row" style="margin-top:0">
+            <button class="btn ghost" id="todoMinus" style="width:52px">−</button>
+            <b id="todoCount" style="font-size:22px;min-width:6em;text-align:center">0 件没做</b>
+            <button class="btn ghost" id="todoPlus" style="width:52px">＋</button>
+          </div>
+          <div class="row">
+            <button id="sendTodo" class="btn" disabled>只发待办</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ------------------------------------------------------------ 名片墙 -->
+      <section class="panel" data-panel="wall">
+        <div class="panelhead">
+          <h2>名片墙</h2>
+          <span class="pill">遇见过的人</span>
+        </div>
+        <div class="card" id="wallCard">
+          <div class="row" style="margin-top:0">
+            <button id="wallRead" class="btn" disabled>读取名片夹</button>
+            <button id="wallSave" class="btn ghost" disabled>存成一张图</button>
+          </div>
+          <p class="hint" id="wallMeta">还没读。先连上卡片，再按这里读。</p>
+          <div class="wallgrid" id="wallGrid"></div>
+          <p class="hint">读的是卡片记住的 16 个人：脸、名字、合章、上次见面的时间。脸是当场算出来的，和卡上那张一模一样。</p>
+          <canvas id="wallCanvas" width="720" height="900" hidden></canvas>
+        </div>
+      </section>
+
+      <!-- ------------------------------------------------------------ 更多 -->
+      <section class="panel" data-panel="more">
+        <div class="panelhead">
+          <h2>更多</h2>
+          <span class="pill">遥控 · 预设 · 工具</span>
+        </div>
+
+        <div class="card">
+          <h3>远程控制</h3>
+          <p class="hint" style="margin-top:0">电脑或手机点一下，卡片就执行——演示时不用站在设备旁边。</p>
+          <div class="rcmd" id="remoteGrid"></div>
+          <div class="row">
+            <button id="voiceBtn" class="btn ghost" disabled>说一句</button>
+            <span class="status" id="voiceState">例如：打开课表 / 番茄钟二十五分钟</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>演示预设</h3>
+          <p class="hint" style="margin-top:0">一键填好姓名、课表（含周六日）、饭表、词表和待办，再点最上面的「全部写进卡片」。</p>
+          <div class="row">
+            <button id="fillPreset" class="btn">填入演示预设</button>
+            <span class="status" id="presetState"></span>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>其他</h3>
+          <div class="row" style="margin-top:0">
+            <button id="syncTime" class="btn" disabled>对时</button>
+            <button id="findMe" class="btn" disabled>让卡片响 30 秒</button>
+            <button id="clearWords" class="btn ghost" disabled>清空词表</button>
+          </div>
+        </div>
+
+        <div id="log"></div>
+
+        <details>
+          <summary>连不上？</summary>
+          <p>
+            卡片用的是 <b>Nordic UART Service（NUS）</b>，蓝牙调试工具的事实标准：
+            服务 <code>6E400001-B5A3-F393-E0A9-E50E24DCCA9E</code>，
+            写特征值 <code>6E400002-…</code>，通知特征值 <code>6E400003-…</code>，
+            广播名 <b>Passport</b>。nRF Connect、LightBlue、Serial Bluetooth Terminal 都能直接写。
+          </p>
+          <p>
+            线上格式是「长度前缀 + 帧」，例如发一条待办 <code>0x15</code> 写成十六进制是
+            <code>03 02 15</code>；发一个词 <code>apple / 苹果</code> 是
+            <code>0F 07 00 05 06 61 70 70 6C 65 E8 8B B9 E6 9E 9C</code>。多字节整数是小端。
+          </p>
+          <p>
+            找不到设备：卡片上的窗口关了，长按下键重开。连上却发不动：窗口到点断开了，重开再连。
+            iPhone 的 Safari 没有 Web Bluetooth。
+          </p>
+        </details>
+      </section>
+
+    </main>
   </div>
 
-  <div class="card" id="wallCard">
-    <h2>名片墙</h2>
-    <div class="row">
-      <button id="wallRead" disabled>读取名片夹</button>
-      <button id="wallSave" class="ghost" disabled>存成一张图</button>
-    </div>
-    <p class="hint" id="wallMeta">还没读。先连上卡片，再按这里读。</p>
-    <div class="wallgrid" id="wallGrid"></div>
-    <p class="hint">读的是卡片记住的 16 个人：脸、名字、合章、上次见面的时间。脸是当场算出来的，和卡上那张一模一样。</p>
-    <canvas id="wallCanvas" width="720" height="900" hidden></canvas>
-  </div>
+  <nav class="bottomnav">
+    <button class="navbtn on" data-tab="album">
+      <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="8.5" cy="9.5" r="1.6"/><path d="M4 17l4.5-4.5 3 3L15 12l5 5"/></svg>
+      相册
+    </button>
+    <button class="navbtn" data-tab="card">
+      <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2.5"/><circle cx="8.5" cy="11" r="1.8"/><path d="M5.5 16c.6-1.6 1.6-2.4 3-2.4s2.4.8 3 2.4M14 10h4M14 13.5h3"/></svg>
+      卡片
+    </button>
+    <button class="navbtn" data-tab="study">
+      <svg viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 016.5 3H19v16H6.5A2.5 2.5 0 004 21.5z"/><path d="M4 18.5A2.5 2.5 0 016.5 16H19"/></svg>
+      学习
+    </button>
+    <button class="navbtn" data-tab="wall">
+      <svg viewBox="0 0 24 24"><circle cx="9" cy="8.5" r="3"/><path d="M3.5 19c.7-3 2.7-4.6 5.5-4.6s4.8 1.6 5.5 4.6"/><circle cx="17" cy="9.5" r="2.2"/><path d="M15 19c.3-2 1.4-3.3 3-3.6"/></svg>
+      名片墙
+    </button>
+    <button class="navbtn" data-tab="more">
+      <svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="18" cy="12" r="1.4"/></svg>
+      更多
+    </button>
+  </nav>
 
-  <div class="card">
-    <h2>其他</h2>
-    <div class="row">
-      <button id="syncTime" disabled>对时</button>
-      <button id="findMe" disabled>让卡片响 30 秒</button>
-      <button id="clearWords" class="ghost" disabled>清空词表</button>
-    </div>
-  </div>
-
-  <div id="log"></div>
-
-  <details>
-    <summary>连不上？</summary>
-    <p>
-      卡片用的是 <b>Nordic UART Service（NUS）</b>，蓝牙调试工具的事实标准：
-      服务 <code>6E400001-B5A3-F393-E0A9-E50E24DCCA9E</code>，
-      写特征值 <code>6E400002-…</code>，通知特征值 <code>6E400003-…</code>，
-      广播名 <b>Passport</b>。nRF Connect、LightBlue、Serial Bluetooth Terminal 都能直接写。
-    </p>
-    <p>
-      线上格式是「长度前缀 + 帧」，例如发一条待办 <code>0x15</code> 写成十六进制是
-      <code>03 02 15</code>；发一个词 <code>apple / 苹果</code> 是
-      <code>0F 07 00 05 06 61 70 70 6C 65 E8 8B B9 E6 9E 9C</code>。多字节整数是小端。
-    </p>
-    <p>
-      找不到设备：卡片上的窗口关了，长按下键重开。连上却发不动：窗口到点断开了，重开再连。
-      iPhone 的 Safari 没有 Web Bluetooth。
-    </p>
-  </details>
-</main>
+</div>
 
 <script src="frames.js"></script>
 <script src="wall.js"></script>
@@ -1451,9 +1701,70 @@ subtle,微妙的"></textarea>
   var albCount = -1;      // 卡片里现在几张;-1 = 还没问过
 
   function albumMeta() {
-    if (albCount < 0) { $('albMeta').textContent = '—'; return; }
+    if (albCount < 0) {
+      $('albMeta').textContent = '—';
+      renderAlbumSlots();
+      return;
+    }
     $('albMeta').textContent = albCount + ' / ' + CardFrames.ALBUM_MAX + ' 张';
     $('albDelNo').max = String(Math.max(1, albCount));
+    renderAlbumSlots();
+  }
+
+  // 31 个格子:有照片的画成深色,没照片的留虚线。
+  // 这样"还剩几格"是看一眼就知道的,不用去读一个数字。
+  function renderAlbumSlots() {
+    var box = $('albSlots');
+    if (!box) return;
+    var max = CardFrames.ALBUM_MAX;
+    var n = albCount < 0 ? 0 : albCount;
+    box.textContent = '';
+    for (var i = 0; i < max; i++) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'slot' + (i < n ? ' full' : '');
+      b.textContent = String(i + 1);
+      if (i < n) {
+        b.dataset.no = String(i + 1);
+        b.addEventListener('click', function () { selectAlbumSlot(this.dataset.no); });
+      } else {
+        b.disabled = true;
+      }
+      box.appendChild(b);
+    }
+    $('albMeter').style.width = (n / max * 100).toFixed(1) + '%';
+    $('albSlotHint').textContent = albCount < 0
+      ? '先点「读取卡片里现有照片」'
+      : (n === 0 ? '卡片里还没有照片' : '点一格选中，再确认删除');
+  }
+
+  function selectAlbumSlot(no) {
+    var cells = document.querySelectorAll('#albSlots .slot');
+    for (var i = 0; i < cells.length; i++) {
+      cells[i].classList.toggle('sel', cells[i].dataset.no === no);
+    }
+    $('albDelNo').value = no;
+    $('albDelText').textContent = '删除第 ' + no + ' 张？删掉后剩下的不挪位置。';
+    $('albDelBar').hidden = false;
+    $('albDel').disabled = !(rx && !busy);
+  }
+
+  function clearAlbumSel() {
+    $('albDelBar').hidden = true;
+    var cells = document.querySelectorAll('#albSlots .slot');
+    for (var i = 0; i < cells.length; i++) cells[i].classList.remove('sel');
+  }
+
+  function showTab(name) {
+    var panels = document.querySelectorAll('.panel');
+    for (var i = 0; i < panels.length; i++) {
+      panels[i].classList.toggle('on', panels[i].dataset.panel === name);
+    }
+    var btns = document.querySelectorAll('[data-tab]');
+    for (var j = 0; j < btns.length; j++) {
+      btns[j].classList.toggle('on', btns[j].dataset.tab === name);
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   function renderAlbum() {
@@ -1468,6 +1779,7 @@ subtle,微妙的"></textarea>
     ctx.drawImage(albImage, (ALB_W - dw) / 2, (ALB_H - dh) / 2, dw, dh);
 
     albBits = CardFrames.rgb565(ctx.getImageData(0, 0, ALB_W, ALB_H).data, ALB_W, ALB_H);
+    $('albDrop').classList.add('hide');
     $('albBar').style.width = '0';
     $('albHint').textContent = '裁成 240×320 后是 ' +
       Math.round(albBits.length / 1024) + ' KB。点「写进卡片」开始传，中途别关这个页面。';
@@ -1575,6 +1887,7 @@ subtle,微妙的"></textarea>
       // 卡片回一行 "DEL OK" / "DEL ERR",等它把目录写完再问总数。
       await new Promise(function (r) { setTimeout(r, 250); });
       await albumQueryRaw();
+      clearAlbumSel();
       log('删掉第 ' + no + ' 张。照片数据留在 flash 里等下次覆盖，不搬不挪。', 'ok');
     });
   }
@@ -1921,6 +2234,29 @@ subtle,微妙的"></textarea>
     $('wallSave').addEventListener('click', saveWall);
     $('fillPreset').addEventListener('click', fillPreset);
     $('voiceBtn').addEventListener('click', voiceOnce);
+
+    // 分页:底部和侧边是同一套按钮,只切显示,不重建内容。
+    var navBtns = document.querySelectorAll('[data-tab]');
+    for (var ni = 0; ni < navBtns.length; ni++) {
+      navBtns[ni].addEventListener('click', function () { showTab(this.dataset.tab); });
+    }
+    renderAlbumSlots();
+
+    // 相册:整块预览就是投放区,电脑上直接把照片拖进来。
+    var albBox = $('albPreview');
+    albBox.addEventListener('click', function () { $('albFile').click(); });
+    ['dragenter', 'dragover'].forEach(function (ev) {
+      albBox.addEventListener(ev, function (e) { e.preventDefault(); albBox.classList.add('over'); });
+    });
+    ['dragleave', 'drop'].forEach(function (ev) {
+      albBox.addEventListener(ev, function (e) { e.preventDefault(); albBox.classList.remove('over'); });
+    });
+    albBox.addEventListener('drop', function (e) {
+      var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if (f) pickAlbum(f);
+    });
+    $('albCancel').addEventListener('click', clearAlbumSel);
+
     buildRemote();
     initVoice();
 
