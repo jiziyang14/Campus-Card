@@ -1,0 +1,1988 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F7F4EA">
+<title>校园卡</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  :root {
+    --paper: #F7F4EA; --ink: #24231F; --muted: #6E6A5F;
+    --rule: #DCD5C2; --red: #B5502F; --teal: #2F6F5E; --card: #FFFDF6;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0; padding: 14px 14px calc(26px + env(safe-area-inset-bottom));
+    background: var(--paper); color: var(--ink);
+    font: 15px/1.7 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  }
+  main { max-width: 600px; margin: 0 auto; }
+  h1 { font-size: 21px; margin: 0 0 4px; letter-spacing: .01em; }
+  .sub { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+  .card {
+    background: var(--card); border-radius: 12px;
+    padding: 14px; margin: 0 0 10px;
+  }
+  h2 { font-size: 14px; margin: 0 0 10px; font-weight: 500; }
+  textarea {
+    width: 100%; border: 1px solid var(--rule); border-radius: 10px;
+    background: #fff; color: var(--ink); padding: 10px;
+    font: 13px/1.6 ui-monospace, "SF Mono", Menlo, monospace;
+    min-height: 140px; resize: vertical;
+  }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+  .card > .row:first-of-type { margin-top: 0; }
+  button {
+    border: 1px solid var(--ink); background: var(--ink); color: var(--paper);
+    padding: 10px 15px; border-radius: 11px; font-size: 14px;
+    cursor: pointer; font-family: inherit;
+  }
+  button.ghost { background: transparent; color: var(--ink); }
+  button.big { width: 100%; padding: 14px; font-size: 16px; border-radius: 13px; }
+  /* 远程控制:一个遥控器。三列,演示时一屏就能看全,不用滚。 */
+  .rcmd { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+  .rcmd button { padding: 9px 4px; font-size: 13px; border-radius: 10px; }
+  button:disabled { opacity: .34; cursor: not-allowed; }
+  .hint { color: var(--muted); font-size: 12px; margin: 10px 0 0; opacity: .9; }
+  .status { font-size: 13px; color: var(--muted); }
+  .dot {
+    display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+    background: var(--rule); margin-right: 6px; vertical-align: middle;
+  }
+  .dot.on { background: var(--teal); }
+  .bar { height: 3px; background: var(--rule); border-radius: 2px; overflow: hidden; margin-top: 10px; }
+  .bar > i { display: block; height: 100%; width: 0; background: var(--red); transition: width .15s; }
+  ul.todo { list-style: none; padding: 0; margin: 0; }
+  ul.todo li { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
+  ul.todo input { width: 20px; height: 20px; accent-color: var(--red); }
+  #log:empty { display: none; }
+  #log {
+    font: 12px/1.65 ui-monospace, "SF Mono", Menlo, monospace;
+    background: #2A2925; color: #E8E2D4; border-radius: 12px;
+    padding: 10px 12px; max-height: 170px; overflow: auto; white-space: pre-wrap;
+  }
+  .warn {
+    border: 1px solid var(--red); color: var(--red); background: #FBF0EC;
+    border-radius: 11px; padding: 10px 12px; font-size: 13px; margin-bottom: 12px;
+  }
+  details { margin-top: 8px; }
+  summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+  details p { color: var(--muted); font-size: 13px; margin: 8px 0 0; }
+  code { background: #F0EBDD; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+
+  /* 名片墙:四列,一屏能看全 16 个人。每格是一张当场画出来的 canvas。 */
+  .wallgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 9px; margin-top: 12px; }
+  .wallcell { text-align: center; }
+  .wallcell canvas {
+    width: 100%; height: auto; display: block; border-radius: 9px;
+    background: var(--paper); image-rendering: pixelated;
+  }
+  .wallcell.empty canvas {
+    background: #F4F0E4;
+    box-shadow: inset 0 0 0 1px var(--rule);
+  }
+  .wallcell b { display: block; font-size: 12px; font-weight: 500; margin-top: 4px; }
+  .wallcell span { display: block; font-size: 10px; color: var(--muted); line-height: 1.45; }
+  .wallmet { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+  .wallmet b { color: var(--ink); font-weight: 600; }
+
+  .fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(148px, 1fr)); gap: 10px; margin-top: 4px; }
+  .fields label { display: block; font-size: 12px; color: var(--muted); }
+  .fields input {
+    width: 100%; margin-top: 4px; padding: 10px 12px;
+    border: 1px solid var(--rule); border-radius: 10px;
+    background: #fff; color: var(--ink); font: 15px/1.4 inherit;
+  }
+  .fields input:focus { outline: 2px solid var(--teal); outline-offset: -1px; }
+
+  /* 课表 / 饭表:表格而不是文本框。底层还是同一批帧,只是不让人手打 CSV。 */
+  .grid { display: grid; grid-template-columns: 20px 1fr 1fr 1.25fr; gap: 6px 7px; align-items: center; }
+  .grid.meal { grid-template-columns: 32px 1fr 1fr 1fr; }
+  .grid .gh { font-size: 11px; color: var(--muted); padding-bottom: 2px; }
+  .grid .gn { font-size: 12px; color: var(--muted); text-align: center; }
+  .grid input, .grid select {
+    width: 100%; padding: 8px 7px; box-sizing: border-box;
+    border: 1px solid var(--rule); border-radius: 9px;
+    background: #fff; color: var(--ink); font: 13px/1.2 inherit;
+    -webkit-appearance: none; appearance: none;
+  }
+  .grid input:focus, .grid select:focus { outline: 2px solid var(--teal); outline-offset: -1px; }
+  .grid input::placeholder { color: #BDB6A4; }
+
+  /* 周末课表收在折叠里:一周五天已经占满一屏,周末不该把页面再拉长一节。 */
+  details.wk { margin-top: 12px; }
+  details.wk summary {
+    cursor: pointer; font-size: 13px; color: var(--muted);
+    padding: 6px 0; list-style: none;
+  }
+  details.wk summary::-webkit-details-marker { display: none; }
+  details.wk summary::before { content: '＋ '; color: var(--teal); }
+  details.wk[open] summary::before { content: '－ '; }
+  details.wk .grid { margin-top: 6px; }
+
+  /* 首页背景:左边一块 240×320 的等比预览,右边几个控件。 */
+  .bgrow { display: grid; grid-template-columns: 120px 1fr; gap: 12px; align-items: start; }
+  .bgprev { position: relative; width: 120px; height: 160px; border-radius: 8px;
+            overflow: hidden; border: 1px solid var(--rule); background: var(--paper); }
+  .bgprev canvas { width: 120px; height: 160px; display: block; }
+  .bgtext { position: absolute; inset: 0; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; gap: 3px; color: #24231F; }
+  .bgtext b { font-size: 19px; letter-spacing: -.5px; }
+  .bgtext span { font-size: 11px; font-weight: 600; }
+  .bgtext em { font-size: 10px; font-style: normal; opacity: .75; }
+  .bgctl { display: flex; flex-direction: column; gap: 6px; }
+  .bgctl button { padding: 7px 10px; font-size: 13px; }
+  .bglabel { font-size: 12px; color: var(--muted); }
+  .bglabel b { color: var(--ink); font-weight: 600; }
+  .bgctl input[type=range] { width: 100%; margin: 0; }
+
+  /* 相册:预览还是 240×320,只是显示得小一半。删照片那一行要横着排。 */
+  .albdel { display: flex; gap: 6px; align-items: center; }
+  .albdel input { width: 58px; padding: 6px 8px; font-size: 13px;
+                  border: 1px solid var(--rule); border-radius: 8px; background: var(--paper); color: var(--ink); }
+  .albdel button { flex: 1; }
+
+  /* 电脑上把卡片排成两列:词表、课表这些长文本本来就该用大屏编辑。 */
+  @media (min-width: 940px) {
+    main { max-width: 1120px; display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px; align-items: start; }
+    main > h1, main > .sub, main > #unsupported,
+    main > #log, main > details { grid-column: 1 / -1; }
+  }
+
+  /* 手绘卡面:12×12 拼豆 */
+  .face-wrap { display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
+  .face-grid {
+    display: grid; grid-template-columns: repeat(12, 21px); gap: 1px;
+    background: #d8cfb4; padding: 3px; border-radius: 6px;
+    touch-action: none; user-select: none;
+  }
+  .face-grid i { width: 21px; height: 21px; display: block; border-radius: 2px;
+    box-shadow: inset 0 0 0 1px rgba(36,35,31,.07); }
+  .face-pal { display: flex; flex-direction: column; gap: 8px; }
+  .face-pal button {
+    width: 40px; height: 40px; border-radius: 10px; border: 2px solid transparent;
+    padding: 0; cursor: pointer;
+  }
+  .face-pal button.on { border-color: #2f6f5e; box-shadow: 0 0 0 2px rgba(47,111,94,.25); }
+</style>
+</head>
+<body>
+<main>
+  <h1>校园卡</h1>
+  <p class="sub">不装 App，用浏览器改卡上的东西。</p>
+
+  <div id="unsupported" class="warn" hidden>
+    这个浏览器没有 Web Bluetooth。Android 用 Chrome，iPhone 用 Bluefy。
+  </div>
+
+  <div class="card">
+    <h2>连接卡片</h2>
+    <div class="row">
+      <button id="connect">连接卡片</button>
+      <button id="disconnect" class="ghost" disabled>断开</button>
+      <span class="status"><span class="dot" id="dot"></span><span id="cstate">未连接</span></span>
+    </div>
+    <div class="row">
+      <button id="sendAll" class="big" disabled>全部写进卡片</button>
+    </div>
+    <div class="bar"><i id="allbar"></i></div>
+    <p class="hint">卡片上：菜单 → 工具 → <b>连设备</b>，屏幕出现二维码后回来连。</p>
+  </div>
+
+  <div class="card">
+    <h2>演示预设</h2>
+    <p class="hint">一键填好姓名、课表（含周六日）、饭表、词表和待办，再点上面的「全部写进卡片」。</p>
+    <div class="row">
+      <button id="fillPreset" class="big">填入演示预设</button>
+      <span class="status" id="presetState"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>远程控制</h2>
+    <p class="hint">电脑或手机点一下，卡片就执行——演示时不用站在设备旁边。</p>
+    <div class="rcmd" id="remoteGrid"></div>
+    <div class="row">
+      <button id="voiceBtn" class="ghost" disabled>🎤 说一句</button>
+      <span class="status" id="voiceState">例如：打开课表 / 番茄钟二十五分钟</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>个人信息</h2>
+    <div class="fields">
+      <label>姓名<input id="pname" maxlength="12" placeholder="林小满" autocomplete="off"></label>
+      <label>班级<input id="pclass" maxlength="15" placeholder="高二(3)班" autocomplete="off"></label>
+      <label>学号<input id="pno" maxlength="10" placeholder="0421" autocomplete="off"></label>
+      <label>口号<input id="pslogan" maxlength="18" placeholder="今天也要加油" autocomplete="off"></label>
+    </div>
+    <div class="row">
+      <button id="sendProfile" disabled>写进卡里</button>
+      <span class="status" id="pstate"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>词表</h2>
+    <textarea id="words" spellcheck="false" placeholder="每行一个词，英文和释义用逗号或空格隔开：
+apple,苹果
+anchor,n. 锚；支柱
+subtle,微妙的"></textarea>
+    <div class="row">
+      <input type="file" id="file" accept=".txt,.csv,text/plain" style="display:none">
+      <button id="pick" class="ghost">读入 txt / csv</button>
+      <button id="sendWords" disabled>只发词表</button>
+      <span class="status" id="wordCount">0 个词</span>
+    </div>
+    <div class="bar"><i id="wbar"></i></div>
+    <p class="hint">最多 60 个词，内容自动保存。</p>
+  </div>
+
+  <div class="card">
+    <h2>课表</h2>
+    <div class="grid" id="periodGrid">
+      <div class="gh">#</div><div class="gh">开始</div><div class="gh">结束</div><div class="gh">课程</div>
+    </div>
+    <details class="wk">
+      <summary>周六课表</summary>
+      <div class="grid" id="satGrid">
+        <div class="gh">#</div><div class="gh">开始</div><div class="gh">结束</div><div class="gh">课程</div>
+      </div>
+    </details>
+    <details class="wk">
+      <summary>周日课表</summary>
+      <div class="grid" id="sunGrid">
+        <div class="gh">#</div><div class="gh">开始</div><div class="gh">结束</div><div class="gh">课程</div>
+      </div>
+    </details>
+    <div class="row">
+      <button id="sendPeriods" disabled>只发课表</button>
+      <span class="status" id="periodCount">0 节</span>
+    </div>
+    <p class="hint">周一到周五共用上面那张；周六、周日各一张。开始时间留空就是这节课没有。</p>
+  </div>
+
+  <div class="card">
+    <h2>饭表</h2>
+    <div class="grid meal" id="mealGrid">
+      <div class="gh">周</div><div class="gh">早</div><div class="gh">午</div><div class="gh">晚</div>
+    </div>
+    <div class="row">
+      <button id="sendMeals" disabled>只发饭表</button>
+      <button id="clearMeals" class="ghost" disabled>清空饭表</button>
+      <span class="status" id="mealCount">0 顿</span>
+    </div>
+    <p class="hint">只发填了的格子，没填的在卡上保持原样。</p>
+  </div>
+
+  <div class="card">
+    <h2>待办</h2>
+    <div class="row" style="align-items:center;gap:10px">
+      <button class="ghost" id="todoMinus" style="width:48px">−</button>
+      <b id="todoCount" style="font-size:26px;min-width:2.4em;text-align:center">0</b>
+      <button class="ghost" id="todoPlus" style="width:48px">＋</button>
+      <span class="status">件</span>
+    </div>
+    <div class="row">
+      <button id="sendTodo" disabled>只发待办</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>手绘卡面</h2>
+    <p class="hint">点一下上色，按住可以拖着涂。</p>
+    <div class="face-wrap">
+      <div id="faceGrid" class="face-grid"></div>
+      <div class="face-pal" id="facePal">
+        <button data-c="1" style="background:#24231F"></button>
+        <button data-c="2" style="background:#B5502F"></button>
+        <button data-c="3" style="background:#2F6F5E"></button>
+        <button data-c="0" style="background:#DCD1B2"></button>
+      </div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button id="sendFace" disabled>发到卡片</button>
+      <button id="clearFace" class="ghost">清空画布</button>
+    </div>
+  </div>
+
+  <div class="card" id="bgCard">
+    <h2>首页背景</h2>
+    <div class="bgrow">
+      <div class="bgprev">
+        <canvas id="bgCanvas" width="240" height="320"></canvas>
+        <!-- 叠一层真的文字:不然看不出"这张图会不会把字压没" -->
+        <div class="bgtext"><b>9:41</b><span>林小满</span><em>空闲</em></div>
+      </div>
+      <div class="bgctl">
+        <button id="bgPick" class="ghost">选一张图片</button>
+        <input type="file" id="bgFile" accept="image/*" hidden>
+        <label class="bglabel">暗部墨点上限 <b id="bgInk">—</b></label>
+        <input type="range" id="bgCover" min="15" max="75" step="1" value="55">
+        <button id="bgSend" disabled>写进卡片</button>
+        <button id="bgClear" class="ghost" disabled>去掉背景</button>
+        <div class="bar"><i id="bgBar"></i></div>
+      </div>
+    </div>
+    <p class="hint">照片会变成黑白网点。墨点越多越像照片，字越难认。</p>
+  </div>
+
+  <div class="card" id="albumCard">
+    <h2>相册</h2>
+    <div class="bgrow">
+      <div class="bgprev"><canvas id="albCanvas" width="240" height="320"></canvas></div>
+      <div class="bgctl">
+        <button id="albPick" class="ghost">选一张照片</button>
+        <input type="file" id="albFile" accept="image/*" hidden>
+        <label class="bglabel">卡片里 <b id="albMeta">—</b></label>
+        <button id="albSend" disabled>写进卡片</button>
+        <div class="albdel">
+          <input id="albDelNo" type="number" min="1" value="1" inputmode="numeric">
+          <button id="albDel" class="ghost" disabled>删掉这张</button>
+        </div>
+        <button id="albRefresh" class="ghost" disabled>读一下卡片</button>
+        <div class="bar"><i id="albBar"></i></div>
+      </div>
+    </div>
+    <p class="hint" id="albHint">全彩 240×320。卡片最多存 31 张，一张 150 KB，满了会拒收 —— 不会挤掉旧照片。</p>
+  </div>
+
+  <div class="card" id="wallCard">
+    <h2>名片墙</h2>
+    <div class="row">
+      <button id="wallRead" disabled>读取名片夹</button>
+      <button id="wallSave" class="ghost" disabled>存成一张图</button>
+    </div>
+    <p class="hint" id="wallMeta">还没读。先连上卡片，再按这里读。</p>
+    <div class="wallgrid" id="wallGrid"></div>
+    <p class="hint">读的是卡片记住的 16 个人：脸、名字、合章、上次见面的时间。脸是当场算出来的，和卡上那张一模一样。</p>
+    <canvas id="wallCanvas" width="720" height="900" hidden></canvas>
+  </div>
+
+  <div class="card">
+    <h2>其他</h2>
+    <div class="row">
+      <button id="syncTime" disabled>对时</button>
+      <button id="findMe" disabled>让卡片响 30 秒</button>
+      <button id="clearWords" class="ghost" disabled>清空词表</button>
+    </div>
+  </div>
+
+  <div id="log"></div>
+
+  <details>
+    <summary>连不上？</summary>
+    <p>
+      卡片用的是 <b>Nordic UART Service（NUS）</b>，蓝牙调试工具的事实标准：
+      服务 <code>6E400001-B5A3-F393-E0A9-E50E24DCCA9E</code>，
+      写特征值 <code>6E400002-…</code>，通知特征值 <code>6E400003-…</code>，
+      广播名 <b>Passport</b>。nRF Connect、LightBlue、Serial Bluetooth Terminal 都能直接写。
+    </p>
+    <p>
+      线上格式是「长度前缀 + 帧」，例如发一条待办 <code>0x15</code> 写成十六进制是
+      <code>03 02 15</code>；发一个词 <code>apple / 苹果</code> 是
+      <code>0F 07 00 05 06 61 70 70 6C 65 E8 8B B9 E6 9E 9C</code>。多字节整数是小端。
+    </p>
+    <p>
+      找不到设备：卡片上的窗口关了，长按下键重开。连上却发不动：窗口到点断开了，重开再连。
+      iPhone 的 Safari 没有 Web Bluetooth。
+    </p>
+  </details>
+</main>
+
+<script src="frames.js"></script>
+<script src="wall.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var NUS = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+  var RX  = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
+  var TX  = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
+  var CHUNK = 20;                       // BLE 默认 MTU 23 下最保险的一片
+  var STORE = 'passport.card.v1';
+  var NAMES = ['语文','数学','英语','物理','化学','生物','政治','历史',
+               '地理','体育','音乐','美术','自习','班会','实验','信息'];
+
+  // 远程控制的命令号 —— 与固件 main/card_link.h 的 CARD_CMD_* 一一对应。
+  // 只能在末尾追加:固件和网页是分开更新的,插队会让旧固件执行错命令。
+  var CMD = {
+    HOME: 0, MENU: 1, SCHEDULE: 2, MEAL: 3, WORDS: 4, POMO: 5,
+    MUSIC: 6, MUSIC_NEXT: 7, FIND: 8, FLASHLIGHT: 9, NOISE: 10, BREATHE: 11,
+    STOPWATCH: 12, REC: 13, GALLERY: 14, SETTINGS: 15, SLEEP: 16, STATUS: 17,
+    VOLUME: 18, BRIGHT: 19
+  };
+
+  // 按钮顺序按"演示动线"排:先屏幕,再学习,再工具,最后设置。
+  var REMOTE = [
+    ['表盘', CMD.HOME, 0], ['菜单', CMD.MENU, 0], ['课表', CMD.SCHEDULE, 0],
+    ['饭表', CMD.MEAL, 0], ['名片', CMD.GALLERY, 0], ['设置', CMD.SETTINGS, 0],
+    ['番茄 25', CMD.POMO, 25], ['番茄 5', CMD.POMO, 5], ['背单词', CMD.WORDS, 0],
+    ['音乐', CMD.MUSIC, 0], ['下一首', CMD.MUSIC_NEXT, 0], ['找卡 15s', CMD.FIND, 15],
+    ['手电筒', CMD.FLASHLIGHT, 0], ['录音', CMD.REC, 0], ['噪声计', CMD.NOISE, 0],
+    ['呼吸', CMD.BREATHE, 0], ['秒表', CMD.STOPWATCH, 0], ['换状态', CMD.STATUS, 0],
+    ['音量 50', CMD.VOLUME, 50], ['亮度 100', CMD.BRIGHT, 100], ['息屏', CMD.SLEEP, 0]
+  ];
+
+  var PRESET_WORDS = [
+    'apple,苹果',
+    'anchor,n. 锚；支柱',
+    'subtle,微妙的',
+    'diligent,勤奋的',
+    'harvest,收获',
+    'curious,好奇的',
+    'margin,页边空白；差额',
+    'schedule,日程；安排'
+  ].join('\n');
+
+  var $ = function (id) { return document.getElementById(id); };
+  var logEl = $('log');
+  var device = null, rx = null, tx = null, busy = false;
+
+  // ---------------------------------------------------------------- 一问一答
+  //
+  // 卡片有两条回执通道:
+  //   · 文字——"收到 12/60"这种进度,只保留最新一条,排队没有意义;
+  //   · 二进制——名片夹的每条记录。**必须一问一答**:手机上问第 i 条,
+  //     卡片回 11 字节。一次只挂一个等待,长度对上才算数,对不上就当文字日志处理。
+  //     这样即使固件版本不匹配(回的字节数不同),也只是"读不到",不会错位。
+  var pendingReply = null;
+
+  function takeReply(bytes) {
+    if (!pendingReply || bytes.length !== pendingReply.len) return false;
+    var p = pendingReply;
+    pendingReply = null;
+    clearTimeout(p.timer);
+    p.resolve(bytes);
+    return true;
+  }
+
+  function ask(bytes, len, what) {
+    return new Promise(function (resolve, reject) {
+      if (!rx || !tx) { reject(new Error('还没连上卡片')); return; }
+      if (pendingReply) { reject(new Error('上一条还没回，等一下再读')); return; }
+      pendingReply = {
+        len: len, resolve: resolve,
+        timer: setTimeout(function () {
+          pendingReply = null;
+          reject(new Error((what || '卡片') + '没回话（窗口关了？旧固件？）'));
+        }, 1600)
+      };
+      writeFrame(bytes).catch(function (e) {
+        if (pendingReply) { clearTimeout(pendingReply.timer); pendingReply = null; }
+        reject(e);
+      });
+    });
+  }
+
+  // 文字回执按**前缀**认领:"ALBUM 3/31" 这种一行字的格式不会变长变短,
+  // 没法像二进制那样用长度对上,所以用前缀 + 超时。认领不到就照常写进日志。
+  var pendingText = null;
+
+  function takeText(bytes) {
+    if (!pendingText) return false;
+    var s = new TextDecoder().decode(bytes).trim();
+    if (s.indexOf(pendingText.prefix) !== 0) return false;
+    var p = pendingText;
+    pendingText = null;
+    clearTimeout(p.timer);
+    p.resolve(s);
+    return true;
+  }
+
+  function askText(bytes, prefix, what) {
+    return new Promise(function (resolve, reject) {
+      if (!rx || !tx) { reject(new Error('还没连上卡片')); return; }
+      if (pendingText) { reject(new Error('上一条还没回，等一下再读')); return; }
+      pendingText = {
+        prefix: prefix, resolve: resolve,
+        timer: setTimeout(function () {
+          pendingText = null;
+          reject(new Error((what || '卡片') + '没回话（窗口关了？旧固件？）'));
+        }, 1600)
+      };
+      writeFrame(bytes).catch(function (e) {
+        if (pendingText) { clearTimeout(pendingText.timer); pendingText = null; }
+        reject(e);
+      });
+    });
+  }
+
+
+  // ---------------------------------------------------------------- 日志与状态
+  function log(msg, cls) {
+    var t = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+    logEl.textContent = '[' + t + '] ' + msg + '\n' + logEl.textContent;
+    logEl.style.color = cls === 'bad' ? '#F2B8A2' : (cls === 'ok' ? '#CFE8DA' : '#E8E2D4');
+  }
+
+  function setConnected(on) {
+    $('dot').className = 'dot' + (on ? ' on' : '');
+    $('cstate').textContent = on ? '已连接' : '未连接';
+    $('connect').disabled = on;
+    $('disconnect').disabled = !on;
+    refreshButtons();
+  }
+
+  function refreshButtons() {
+    var on = !!(rx && !busy);
+    $('sendAll').disabled = !on;
+    $('sendFace').disabled = !on;
+    $('sendWords').disabled = !on;
+    $('sendPeriods').disabled = !on;
+    $('sendTodo').disabled = !on;
+    $('syncTime').disabled = !on;
+    $('findMe').disabled = !on;
+    $('clearWords').disabled = !on;
+    $('sendProfile').disabled = !on;
+    $('sendMeals').disabled = !on;
+    $('bgSend').disabled = !on || !bgBits;
+    $('bgClear').disabled = !on;
+    $('albSend').disabled = !on || !albBits;
+    $('albDel').disabled = !on || !(albCount > 0);
+    $('albRefresh').disabled = !on;
+    $('clearMeals').disabled = !on;
+    $('wallRead').disabled = !on;
+    $('wallSave').disabled = !on || !wallRecs || !wallRecs.length;
+    var rb = document.querySelectorAll('#remoteGrid button');
+    for (var i = 0; i < rb.length; i++) rb[i].disabled = !on;
+    if ($('voiceBtn')) $('voiceBtn').disabled = !on || !recognizer;
+  }
+
+  // ---------------------------------------------------------------- 本地记忆
+  function save() {
+    try {
+      localStorage.setItem(STORE, JSON.stringify({
+        words: $('words').value,
+        periods: dumpPeriods(),
+        weekSat: dumpWeek('satGrid'),
+        weekSun: dumpWeek('sunGrid'),
+        meals: dumpMeals(),
+        todoN: todoN,
+        profile: {
+          name: $('pname').value, klass: $('pclass').value,
+          no: $('pno').value, slogan: $('pslogan').value
+        },
+      }));
+    } catch (e) { /* 无痕模式写不进去,不影响发送 */ }
+  }
+
+  // 第一次打开时铺进来的内容 —— 和固件 card_defaults.c 逐项一致。
+  //
+  // 为什么不叫"示例":它就是卡片出厂的课表和饭表。用户打开手机页,
+  // 看到的应该和自己卡上一样,然后改哪节改哪节;而不是面对 8 个空行
+  // 重新填一遍 —— 那会让人以为"卡上的课表被清了"。
+  //
+  // 清空过就不要再铺:存档里有一份空的数组,那就是用户说"我要空的"。
+  var DEFAULT_PERIODS = [
+    { start: '08:00', end: '08:45', name: '0' },
+    { start: '08:55', end: '09:40', name: '1' },
+    { start: '10:00', end: '10:45', name: '2' },
+    { start: '10:55', end: '11:40', name: '3' },
+    { start: '14:00', end: '14:45', name: '4' },
+    { start: '14:55', end: '15:40', name: '5' },
+    { start: '16:00', end: '16:45', name: '9' },
+    { start: '16:55', end: '17:40', name: '12' }
+  ];
+  var DEFAULT_MEALS = [
+    ['豆浆油条', '番茄炒蛋', '青菜面'],
+    ['小米粥鸡蛋', '红烧肉盖饭', '鲜肉馄饨'],
+    ['肉包豆浆', '土豆烧鸡', '蛋炒饭'],
+    ['白粥咸菜', '鱼香肉丝', '牛肉面'],
+    ['煎饼果子', '糖醋排骨', '白菜饺子'],
+    ['小笼包豆浆', '咖喱鸡饭', '麻辣烫'],
+    ['鸡蛋灌饼', '排骨面', '三鲜水饺']
+  ];
+
+  // 周六补课四节、周日自习加一场球 —— 和 card_defaults.c 的 k_seed_sat/sun 逐项一致。
+  // 周末单独两张表,因为"周六有课、周日没有"是这所学校真实的样子;
+  // 把两天合成一张,怎么填都有一半是假的。
+  var DEFAULT_WEEK_SAT = [
+    { start: '08:00', end: '08:45', name: '1' },
+    { start: '08:55', end: '09:40', name: '2' },
+    { start: '10:00', end: '10:45', name: '3' },
+    { start: '10:55', end: '11:40', name: '12' }
+  ];
+  var DEFAULT_WEEK_SUN = [
+    { start: '09:00', end: '10:30', name: '12' },
+    { start: '15:00', end: '16:00', name: '9' }
+  ];
+
+  // 老存档迁移:以前 textarea 里的原文。读到了就把文本拆成表格行,迁一次。
+  function migratePeriods(text) {
+    var out = [];
+    var pad = function (x) { return ('0' + x).slice(-2); };
+    text.split('\n').forEach(function (line) {
+      var t = line.trim();
+      if (!t) return;
+      var m = t.split(/[\s,]+/);
+      if (m.length < 4) return;
+      var s1 = hm(m[1]), s2 = hm(m[2]);
+      out.push({
+        start: pad(Math.floor(s1 / 60)) + ':' + pad(s1 % 60),
+        end:   pad(Math.floor(s2 / 60)) + ':' + pad(s2 % 60),
+        name:  String(Math.max(0, NAMES.indexOf(m[3])))
+      });
+    });
+    return out;
+  }
+
+  function migrateMeals(text) {
+    var days = { '周一':0, '周二':1, '周三':2, '周四':3, '周五':4, '周六':5, '周日':6,
+                 '星期一':0, '星期二':1, '星期三':2, '星期四':3, '星期五':4, '星期六':5, '星期日':6 };
+    var kinds = { '早':0, '早餐':0, '早饭':0, '午':1, '中午':1, '午餐':1, '午饭':1, '晚':2, '晚餐':2, '晚饭':2 };
+    var rows = [[], [], [], [], [], [], []];
+    text.split('\n').forEach(function (line) {
+      var t = line.trim();
+      if (!t) return;
+      var m = t.split(/[\s,，]+/);
+      if (m.length < 3) return;
+      var d = days[m[0]], k = kinds[m[1]];
+      if (d === undefined || k === undefined) return;
+      rows[d][k] = m.slice(2).join(' ');
+    });
+    return rows;
+  }
+
+  function load() {
+    try {
+      var raw = localStorage.getItem(STORE);
+      if (!raw) return false;
+      var d = JSON.parse(raw);
+      if (d.words) $('words').value = d.words;
+      // 新格式是数组,旧格式是字符串 —— 两种都认,旧的顺手迁过来。
+      if (Array.isArray(d.periods)) fillPeriods(d.periods);
+      else if (typeof d.periods === 'string' && d.periods.trim()) fillPeriods(migratePeriods(d.periods));
+      // 旧存档没有 weekSat/weekSun:补出厂周末，而不是补两个空表。
+      // 空表会在下一次「只发课表」时把卡上的周末清掉。
+      fillWeek('satGrid', Array.isArray(d.weekSat) ? d.weekSat : DEFAULT_WEEK_SAT);
+      fillWeek('sunGrid', Array.isArray(d.weekSun) ? d.weekSun : DEFAULT_WEEK_SUN);
+      if (Array.isArray(d.meals)) fillMeals(d.meals);
+      else if (typeof d.meals === 'string' && d.meals.trim()) fillMeals(migrateMeals(d.meals));
+      if (typeof d.todoN === 'number') todoSet(d.todoN);
+      if (d.profile) {
+        $('pname').value = d.profile.name || '';
+        $('pclass').value = d.profile.klass || '';
+        $('pno').value = d.profile.no || '';
+        $('pslogan').value = d.profile.slogan || '';
+      }
+      return true;
+    } catch (e) { return false; }   /* 存的东西坏了,当第一次打开 */
+  }
+
+  // ---------------------------------------------------------------- 连接
+  async function connect() {
+    if (!navigator.bluetooth) return;
+    try {
+      log('正在找卡片（先在卡上打开「连手机」）…');
+      device = await navigator.bluetooth.requestDevice({
+        filters: [{ services: [NUS] }],
+        optionalServices: [NUS]
+      });
+      log('找到：' + (device.name || '(无名)'));
+      device.addEventListener('gattserverdisconnected', function () {
+        rx = null; tx = null;
+        albCount = -1;          // 换了一台卡、或者窗口关了:张数得重新问
+        setConnected(false);
+        log('卡片断开了：窗口到点，或卡上按了键。回卡上长按下重新开窗，再点连接。', 'bad');
+      });
+
+      var server = await device.gatt.connect();
+      var svc = await server.getPrimaryService(NUS);
+      rx = await svc.getCharacteristic(RX);
+      tx = await svc.getCharacteristic(TX);
+
+      try {
+        await tx.startNotifications();
+        tx.addEventListener('characteristicvaluechanged', function (e) {
+          var dv = e.target.value;
+          var bytes = new Uint8Array(dv.buffer, dv.byteOffset, dv.byteLength);
+          // 二进制回执(名片夹)优先:它是"我问来的",长度对得上就归它。
+          if (takeReply(bytes)) return;
+          if (takeText(bytes)) return;
+          log('卡片：' + new TextDecoder().decode(dv).trim(), 'ok');
+        });
+      } catch (e) {
+        log('订阅回执失败（不影响发数据）：' + e.message);
+      }
+
+      setConnected(true);
+      await probeChunk();
+      // 连上先对一次时。卡上没有 RTC，"今天是周几"只有手机知道——
+      // 少了这一下，表盘上那三顿饭要等用户想起来点「对时」才出现。
+      try {
+        await sendFrames(timeFrames().frames);
+        log('已对时 ' + clockText(), 'ok');
+      } catch (e) {
+        log('对时没成功（不影响发别的）：' + e.message, 'bad');
+      }
+      log('连上了。点「全部写进卡片」就行；只改了一项也可以单独发。', 'ok');
+    } catch (e) {
+      log('连接失败：' + (e && e.message ? e.message : e), 'bad');
+      log('检查：卡片是不是还在「连设备」窗口里（3 分钟就关）。', 'bad');
+    }
+  }
+
+  // ---------------------------------------------------------------- 发送
+  async function writeFrame(bytes) {
+    var parts = CardFrames.chunk(bytes, CHUNK);
+    for (var i = 0; i < parts.length; i++) {
+      if (rx.properties.write) await rx.writeValueWithResponse(parts[i]);
+      else await rx.writeValueWithoutResponse(parts[i]);
+    }
+  }
+
+  async function sendFrames(frames, onProgress) {
+    if (!rx) throw new Error('还没连上卡片');
+    for (var i = 0; i < frames.length; i++) {
+      await writeFrame(frames[i]);
+      if (onProgress) onProgress(i + 1, frames.length);
+      if (i % 8 === 7) await new Promise(function (r) { setTimeout(r, 10); });
+    }
+  }
+
+  // 一次能写多大:默认 20 是 MTU 23 的保险值,可一张照片 153 600 字节,
+  // 按 20 发要七千多次写。固件那边一包能收 244(队列按 64 字节切段),
+  // 所以连上先探一档:发一整包**全 0** —— 分帧层把 0 当坏长度前缀直接丢掉,
+  // 不解析、不改状态、也不回执,探起来没有任何副作用。
+  async function probeChunk() {
+    if (!rx || !rx.properties || !rx.properties.write) return;   // 只能无响应写,探不出上限
+    var sizes = [244, 180, 120, 20];
+    for (var i = 0; i < sizes.length; i++) {
+      try {
+        await rx.writeValueWithResponse(new Uint8Array(sizes[i]));
+        CHUNK = sizes[i];
+        log('一次写 ' + sizes[i] + ' 字节。');
+        return;
+      } catch (e) { /* 这一档 MTU 不够,试下一档 */ }
+    }
+    CHUNK = 20;
+  }
+
+  async function guard(fn) {
+    if (busy) return;
+    busy = true;
+    refreshButtons();
+    try { await fn(); }
+    catch (e) {
+      log('发送中断：' + (e && e.message ? e.message : e), 'bad');
+      if (!device || !device.gatt.connected) {
+        rx = null; tx = null; setConnected(false);
+      }
+    } finally {
+      busy = false;
+      refreshButtons();
+    }
+  }
+
+  // ---------------------------------------------------------------- 各段内容
+  function parseWords() {
+    return $('words').value.split('\n')
+      .map(CardFrames.parseLine)
+      .filter(Boolean)
+      .slice(0, CardFrames.MAX_WORDS);
+  }
+
+  function wordFrames() {
+    var list = parseWords();
+    if (!list.length) return null;
+    var frames = [CardFrames.begin(list.length)];
+    list.forEach(function (w, i) { frames.push(CardFrames.item(i, w.en, w.zh)); });
+    frames.push(CardFrames.end());
+    return { frames: frames, count: list.length };
+  }
+
+  // ---------------------------------------------------------------- 课表
+  // 以前这里是一个 textarea,要让用户手打「1 08:00 08:45 语文」——
+  // 那不是"编辑课表",那是手搓 CSV。现在是一张表:一节一行,
+  // 时间用系统的选择器,课程用下拉。发出去的帧一个字节都没变。
+  var PERIOD_ROWS = 8;
+
+  function hm(s) {
+    var p = String(s).split(':');
+    return (parseInt(p[0], 10) * 60 + parseInt(p[1] || '0', 10)) | 0;
+  }
+
+  function buildPeriodGrid() {
+    var box = $('periodGrid');
+    for (var i = 1; i <= PERIOD_ROWS; i++) {
+      var n = document.createElement('div');
+      n.className = 'gn'; n.textContent = i;
+
+      var st = document.createElement('input');
+      st.type = 'time'; st.className = 'pt';
+      st.dataset.i = i; st.dataset.k = 'start';
+
+      var en = document.createElement('input');
+      en.type = 'time'; en.className = 'pt';
+      en.dataset.i = i; en.dataset.k = 'end';
+
+      var sel = document.createElement('select');
+      sel.className = 'pn'; sel.dataset.i = i;
+      NAMES.forEach(function (nm, idx) {
+        var o = document.createElement('option');
+        o.value = idx; o.textContent = nm;
+        sel.appendChild(o);
+      });
+
+      box.appendChild(n); box.appendChild(st); box.appendChild(en); box.appendChild(sel);
+    }
+  }
+
+  function pt(i, k) { return document.querySelector('.pt[data-i="' + i + '"][data-k="' + k + '"]'); }
+  function pn(i) { return document.querySelector('.pn[data-i="' + i + '"]'); }
+
+  function readPeriods() {
+    var out = [];
+    for (var i = 1; i <= PERIOD_ROWS; i++) {
+      var st = pt(i, 'start').value;
+      if (!st) continue;                       // 开始时间空着 = 这节课没有
+      var en = pt(i, 'end').value;
+      out.push({
+        period: i,
+        start: hm(st),
+        end: en ? hm(en) : hm(st) + 45,        // 没填结束就按 45 分钟
+        nameId: parseInt(pn(i).value, 10) | 0
+      });
+    }
+    return out;
+  }
+
+  // 存进本地的是原始字符串,不是算好的分钟 ——
+  // 下次打开,时间框里还是 "08:00",不是 480。
+  function dumpPeriods() {
+    var out = [];
+    for (var i = 1; i <= PERIOD_ROWS; i++) {
+      out.push({ start: pt(i, 'start').value, end: pt(i, 'end').value, name: pn(i).value });
+    }
+    return out;
+  }
+
+  function fillPeriods(rows) {
+    for (var i = 1; i <= PERIOD_ROWS; i++) {
+      var r = (rows && rows[i - 1]) || {};
+      pt(i, 'start').value = r.start || '';
+      pt(i, 'end').value = r.end || '';
+      if (r.name !== undefined && r.name !== '') pn(i).value = r.name;
+    }
+  }
+
+  function periodFrames() {
+    var list = readPeriods();
+    var weekend = [];
+    [['satGrid', 5], ['sunGrid', 6]].forEach(function (p) {
+      readWeek(p[0]).forEach(function (it) {
+        weekend.push(CardFrames.addPeriodDay(p[1], it.period, it.start, it.end, it.nameId));
+      });
+    });
+    if (!list.length && !weekend.length) return null;
+    // 清空课表清的是整张卡:工作日和周末都算。发出去的帧里必须把两边都补齐，
+    // 否则「只发课表」会把周末悄悄清掉 —— 那是一次看不见的数据丢失。
+    var frames = [CardFrames.clearPlan()];
+    list.forEach(function (p) {
+      frames.push(CardFrames.addPeriod(p.period, p.start, p.end, p.nameId));
+    });
+    frames = frames.concat(weekend);
+    return { frames: frames, count: list.length + weekend.length };
+  }
+
+  // ---------------------------------------------------------------- 周末课表
+  // 周六、周日各一张小表,四行。为什么四行不是八行:周末最多排四节,
+  // 多出来的四行会让"这张表是空的"更难看懂。
+  var WEEK_ROWS = 4;
+
+  function buildWeekGrid(id) {
+    var box = $(id);
+    for (var i = 1; i <= WEEK_ROWS; i++) {
+      var n = document.createElement('div');
+      n.className = 'gn'; n.textContent = i;
+
+      var st = document.createElement('input');
+      st.type = 'time'; st.className = 'wpt';
+      st.dataset.i = i; st.dataset.k = 'start';
+
+      var en = document.createElement('input');
+      en.type = 'time'; en.className = 'wpt';
+      en.dataset.i = i; en.dataset.k = 'end';
+
+      var sel = document.createElement('select');
+      sel.className = 'wpn'; sel.dataset.i = i;
+      NAMES.forEach(function (nm, idx) {
+        var o = document.createElement('option');
+        o.value = idx; o.textContent = nm;
+        sel.appendChild(o);
+      });
+
+      box.appendChild(n); box.appendChild(st); box.appendChild(en); box.appendChild(sel);
+    }
+  }
+
+  // 两张周末表在同一个页面上,所以选择器要带上表自己的 id ——
+  // 只用 .wpt[data-i] 会永远读到周六那张。
+  function wq(id, i, k) {
+    return document.querySelector('#' + id + ' .wpt[data-i="' + i + '"][data-k="' + k + '"]');
+  }
+  function wn(id, i) { return document.querySelector('#' + id + ' .wpn[data-i="' + i + '"]'); }
+
+  function readWeek(id) {
+    var out = [];
+    for (var i = 1; i <= WEEK_ROWS; i++) {
+      var st = wq(id, i, 'start').value;
+      if (!st) continue;
+      var en = wq(id, i, 'end').value;
+      out.push({
+        period: i,
+        start: hm(st),
+        end: en ? hm(en) : hm(st) + 45,
+        nameId: parseInt(wn(id, i).value, 10) | 0
+      });
+    }
+    return out;
+  }
+
+  function dumpWeek(id) {
+    var out = [];
+    for (var i = 1; i <= WEEK_ROWS; i++) {
+      out.push({ start: wq(id, i, 'start').value, end: wq(id, i, 'end').value, name: wn(id, i).value });
+    }
+    return out;
+  }
+
+  function fillWeek(id, rows) {
+    for (var i = 1; i <= WEEK_ROWS; i++) {
+      var r = (rows && rows[i - 1]) || {};
+      wq(id, i, 'start').value = r.start || '';
+      wq(id, i, 'end').value = r.end || '';
+      if (r.name !== undefined && r.name !== '') wn(id, i).value = r.name;
+    }
+  }
+
+  // ---------------------------------------------------------------- 饭表
+  // 表:7 天 × 3 顿。以前也是 textarea("周一 早 豆浆油条")。
+  // 现在直接点格子填。只发填了的格子 —— 没填的几顿在卡上原样留着。
+  var MEAL_DAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+  var MEAL_KINDS = ['早', '午', '晚'];
+  // 占位文字轮着用:每格都写同一句会像模板,轮换着像"例子"。
+  var MEAL_HINT = [
+    ['豆浆油条', '番茄炒蛋', '牛肉面'],
+    ['小笼包', '红烧肉', '蛋炒饭']
+  ];
+
+  function buildMealGrid() {
+    var box = $('mealGrid');
+    for (var d = 0; d < MEAL_DAYS.length; d++) {
+      var n = document.createElement('div');
+      n.className = 'gn';
+      n.textContent = MEAL_DAYS[d].slice(1);   // 只写"一"…"日",格子才放得下
+      box.appendChild(n);
+      for (var k = 0; k < MEAL_KINDS.length; k++) {
+        var inp = document.createElement('input');
+        inp.type = 'text'; inp.className = 'mi';
+        inp.dataset.d = d; inp.dataset.k = k;
+        inp.maxLength = 23;                    // 和 C 侧的 CARD_MEAL_LEN 对齐
+        inp.placeholder = MEAL_HINT[d % 2][k];
+        inp.autocomplete = 'off';
+        box.appendChild(inp);
+      }
+    }
+  }
+
+  function mi(d, k) { return document.querySelector('.mi[data-d="' + d + '"][data-k="' + k + '"]'); }
+
+  function readMeals() {
+    var out = [];
+    for (var d = 0; d < MEAL_DAYS.length; d++) {
+      for (var k = 0; k < MEAL_KINDS.length; k++) {
+        var v = (mi(d, k).value || '').trim();
+        if (v) out.push({ day: d, kind: k, dish: v });
+      }
+    }
+    return out;
+  }
+
+  function dumpMeals() {
+    var out = [];
+    for (var d = 0; d < MEAL_DAYS.length; d++) {
+      out.push([mi(d, 0).value, mi(d, 1).value, mi(d, 2).value]);
+    }
+    return out;
+  }
+
+  function fillMeals(rows) {
+    for (var d = 0; d < MEAL_DAYS.length; d++) {
+      for (var k = 0; k < MEAL_KINDS.length; k++) {
+        mi(d, k).value = (rows && rows[d] && rows[d][k]) || '';
+      }
+    }
+  }
+
+  function mealFrames() {
+    var list = readMeals();
+    if (!list.length) return null;
+    return {
+      frames: list.map(function (x) { return CardFrames.setMeal(x.day, x.kind, x.dish); }),
+      count: list.length
+    };
+  }
+
+  function updateMealCount() {
+    $('mealCount').textContent = readMeals().length + ' 顿';
+  }
+
+  function sendMeals() {
+    return guard(async function () {
+      var part = mealFrames();
+      if (!part) return log('饭表是空的，先填几格。', 'bad');
+      await sendFrames(part.frames);
+      log('饭表发完 ' + part.count + ' 顿。表盘上今天那三餐已经换了。', 'ok');
+    });
+  }
+
+  function clearMeals() {
+    return guard(async function () {
+      await sendFrames([CardFrames.clearMeal()]);
+      fillMeals([]);
+      updateMealCount();
+      save();
+      log('卡上的饭表清空了。', 'ok');
+    });
+  }
+
+  // 待办就是一个 0..5 的数,不是 5 个勾。
+  // 卡片上没有文字,勾第 1、3 件和勾第 2、4 件它分不出来 —— 那还不如直接给数量。
+  var todoN = 0;
+
+  function todoSet(n) {
+    todoN = Math.max(0, Math.min(5, n));
+    $('todoCount').textContent = String(todoN);
+    try { localStorage.setItem('passport.todo', String(todoN)); } catch (e) {}
+  }
+
+  function todoMask() {
+    // 前 todoN 位为 1:和固件 todo_add/todo_del 用的是同一种编码。
+    return todoN === 0 ? 0 : ((1 << todoN) - 1);
+  }
+
+  function todoFrames() {
+    var mask = todoMask();
+    if (!mask) return null;
+    return { frames: [CardFrames.setTodo(mask)], count: mask };
+  }
+
+  function timeFrames() {
+    var d = new Date();
+    // 星期也一起发：卡上没有 RTC，只有手机知道今天是周几——
+    // 而"今天吃什么"就是靠这一个字节算出来的。
+    var wday = (d.getDay() + 6) % 7;          // JS 的 0 是周日，这里 0 是周一
+    return {
+      frames: [CardFrames.setTime(d.getHours() * 60 + d.getMinutes(), wday)],
+      count: 0
+    };
+  }
+
+  // ---------------------------------------------------------------- 一键发送
+  function profileFrames() {
+    var n = $('pname').value.trim();
+    var c = $('pclass').value.trim();
+    var m = $('pno').value.trim();
+    var g = $('pslogan').value.trim();
+    // 口号空着也要发：那是"把卡上那句话去掉"的明确意思。
+    if (!n && !c && !m && !g) return null;
+    return { frames: [CardFrames.setProfile(n, c, m, g)], count: 1 };
+  }
+
+  function sendProfile() {
+    return guard(async function () {
+      var part = profileFrames();
+      if (!part) return log('姓名、班级、学号都是空的，没什么可写。', 'bad');
+      await sendFrames(part.frames);
+      $('pstate').textContent = '已写入';
+      log('个人信息已写入：' +
+          [$('pname').value.trim(), $('pclass').value.trim(), $('pno').value.trim(),
+           $('pslogan').value.trim()]
+            .filter(Boolean).join(' · '), 'ok');
+    });
+  }
+
+  function sendAll() {
+    return guard(async function () {
+      var steps = [
+        { name: '个人信息', part: profileFrames() },
+        { name: '对时', part: timeFrames() },
+        { name: '课表', part: periodFrames() },
+        { name: '饭表', part: mealFrames() },
+        { name: '待办', part: todoFrames() },
+        { name: '词表', part: wordFrames() }
+      ];
+      var todo = steps.filter(function (s) { return s.part; });
+      if (!todo.length) return log('没有可发的内容：先把词表或课表填上。', 'bad');
+
+      var total = todo.reduce(function (n, s) { return n + s.part.frames.length; }, 0);
+      log('一键发送：' + todo.map(function (s) { return s.name; }).join(' → ') + '，共 ' + total + ' 条帧');
+
+      var done = 0;
+      for (var i = 0; i < todo.length; i++) {
+        var s = todo[i];
+        await sendFrames(s.part.frames, function (n) {
+          $('allbar').style.width = Math.round(100 * (done + n) / total) + '%';
+        });
+        done += s.part.frames.length;
+        if (s.name === '个人信息') log('  姓名/班级/学号已写入', 'ok');
+        else if (s.name === '课表') log('  课表 ' + s.part.count + ' 节', 'ok');
+        else if (s.name === '饭表') log('  饭表 ' + s.part.count + ' 顿', 'ok');
+        else if (s.name === '待办') log('  待办掩码 0x' + s.part.count.toString(16), 'ok');
+        else if (s.name === '词表') log('  词表 ' + s.part.count + ' 个词', 'ok');
+        else log('  对时完成', 'ok');
+      }
+      log('全部发完。卡片屏幕上应显示「收到 N / N」，回表盘就能看到下一节和待办红点。', 'ok');
+      $('allbar').style.width = '0';
+    });
+  }
+
+  // ---------------------------------------------------------------- 手绘卡面
+  //
+  // 12×12、四色,像拼豆。点一下上色,按住可以拖着涂。
+  // 打包成 36 字节(2 bit/格)发给卡片,卡片存在 NVS 里,表盘头像就换成这张。
+  var FACE_KEY = 'passport.face';
+  // 颜色下标必须和 main/card_avatar.h 的调色板同序:
+  // 0 纸 / 1 墨 / 2 红 / 3 青
+  var FACE_COLORS = ['#DCD1B2', '#24231F', '#B5502F', '#2F6F5E'];
+  var faceCells = new Array(144).fill(0);
+  var faceColor = 1;
+
+  // 第一次打开给一张示例脸:空白的 12×12 网格看不出"这里可以画"。
+  function faceDefault() {
+    var c = new Array(144).fill(0);
+    for (var y = 2; y <= 9; y++) {
+      for (var x = 2; x <= 9; x++) c[y * 12 + x] = 3;   // 青色脸
+    }
+    c[4 * 12 + 4] = 1; c[4 * 12 + 7] = 1;                // 两只眼睛
+    for (var mx = 4; mx <= 7; mx++) c[7 * 12 + mx] = 1;  // 一条嘴
+    c[2 * 12 + 5] = 1; c[2 * 12 + 6] = 1;                // 头顶两撮
+    return c;
+  }
+
+  function faceLoad() {
+    faceCells = faceDefault();
+    try {
+      var raw = localStorage.getItem(FACE_KEY);
+      if (raw && raw.length === 144) {
+        for (var i = 0; i < 144; i++) {
+          var v = Number(raw[i]);
+          faceCells[i] = (v >= 0 && v <= 3) ? v : 0;
+        }
+      }
+    } catch (e) { /* 无痕模式:不记就不记 */ }
+  }
+
+  function faceStore() {
+    try { localStorage.setItem(FACE_KEY, faceCells.join('')); } catch (e) {}
+  }
+
+  function faceInit() {
+    faceLoad();
+    var g = $('faceGrid');
+    for (var i = 0; i < 144; i++) {
+      var d = document.createElement('i');
+      d.style.background = FACE_COLORS[faceCells[i]];
+      g.appendChild(d);
+    }
+
+    var pal = $('facePal');
+    function pick(c) {
+      faceColor = c;
+      Array.prototype.forEach.call(pal.children, function (b) {
+        b.classList.toggle('on', Number(b.dataset.c) === c);
+      });
+    }
+    Array.prototype.forEach.call(pal.children, function (b) {
+      b.addEventListener('click', function () { pick(Number(b.dataset.c)); });
+    });
+    pick(1);
+
+    function paintAt(ev) {
+      var t = ev.touches ? ev.touches[0] : ev;
+      var el = document.elementFromPoint(t.clientX, t.clientY);
+      if (!el || el.parentNode !== g) return;
+      var idx = Array.prototype.indexOf.call(g.children, el);
+      if (idx < 0 || faceCells[idx] === faceColor) return;
+      faceCells[idx] = faceColor;
+      el.style.background = FACE_COLORS[faceColor];
+      faceStore();
+    }
+
+    var dragging = false;
+    g.addEventListener('pointerdown', function (e) {
+      dragging = true; paintAt(e); e.preventDefault();
+    });
+    g.addEventListener('pointermove', function (e) {
+      if (dragging) { paintAt(e); e.preventDefault(); }
+    });
+    window.addEventListener('pointerup', function () { dragging = false; });
+    window.addEventListener('pointercancel', function () { dragging = false; });
+
+    $('clearFace').addEventListener('click', function () {
+      faceCells.fill(0);
+      Array.prototype.forEach.call(g.children, function (el) {
+        el.style.background = FACE_COLORS[0];
+      });
+      faceStore();
+      log('画布清空了。发一次才会改到卡片上。');
+    });
+
+    $('sendFace').addEventListener('click', function () {
+      return guard(async function () {
+        log('发卡面…');
+        await sendFrames([CardFrames.setFace(faceCells)]);
+        log('卡面发好了。回表盘看一眼——想换回原来的脸，在设置里点「换脸」。', 'ok');
+      });
+    });
+  }
+
+  // ---------------------------------------------------------------- 单项
+  function sendWords() {
+    return guard(async function () {
+      var part = wordFrames();
+      if (!part) return log('词表是空的', 'bad');
+      log('发词表 ' + part.count + ' 个词…');
+      await sendFrames(part.frames, function (n, total) {
+        $('wbar').style.width = Math.round(100 * n / total) + '%';
+      });
+      log('词表发完了。', 'ok');
+      $('wbar').style.width = '0';
+    });
+  }
+
+  function sendPeriods() {
+    return guard(async function () {
+      var part = periodFrames();
+      if (!part) return log('课表是空的：先填几节，或把开始时间留空表示没有这节', 'bad');
+      log('发 ' + part.count + ' 节课（工作日 + 周末）…');
+      await sendFrames(part.frames);
+      log('课表发完了。再「对时」一次，表盘才会显示「下一节」。', 'ok');
+    });
+  }
+
+  function sendTodo() {
+    return guard(async function () {
+      var part = todoFrames();
+      if (!part) return log('件数是 0：卡片上不会出现角标', 'bad');
+      await sendFrames(part.frames);
+      log('待办发完了：' + $('todoCount').textContent, 'ok');
+    });
+  }
+
+  function clockText() {
+    var d = new Date();
+    var wd = '一二三四五六日'[(d.getDay() + 6) % 7];
+    return String(d.getHours()).padStart(2, '0') + ':' +
+           String(d.getMinutes()).padStart(2, '0') + ' · 周' + wd;
+  }
+
+  function syncTime() {
+    return guard(async function () {
+      await sendFrames(timeFrames().frames);
+      log('对时：' + clockText(), 'ok');
+    });
+  }
+
+  function findMe() {
+    return guard(async function () {
+      await sendFrames([CardFrames.findMe(30)]);
+      log('卡片开始闪屏 + 蜂鸣，按任意键停。', 'ok');
+    });
+  }
+
+  function clearWords() {
+    if (!confirm('清空卡片上的词表？卡片上的统计也会一起清掉。')) return;
+    return guard(async function () {
+      await sendFrames([CardFrames.clearWords()]);
+      log('卡上的词表已清空。', 'ok');
+    });
+  }
+
+  // ---------------------------------------------------------------- 首页背景
+  // 一张 240×320 的 1 位位图。为什么不是彩色照片:见固件 main/card_bg.h ——
+  // 这块板没有 PSRAM,而更重要的是这张卡不该变成"能显示图片的小屏幕"。
+  // 1 位 + 抖动得到的是网点:远看是灰,近看是点。那是这套设计本来的画法。
+  var BG_W = 240, BG_H = 320;
+
+  // Bayer 8×8。有序抖动比 Floyd–Steinberg 更适合这里:
+  // Floyd 把误差往邻域推,1 位下会形成大片"蠕虫",看着脏;
+  // Bayer 是规则的网点,像印刷,而且**密度可控** —— 这一点是关键,
+  // 因为我们要把墨点比例压在上限以内,保证字还读得出来。
+  var BAYER = [
+     0, 32,  8, 40,  2, 34, 10, 42,
+    48, 16, 56, 24, 50, 18, 58, 26,
+    12, 44,  4, 36, 14, 46,  6, 38,
+    60, 28, 52, 20, 62, 30, 54, 22,
+     3, 35, 11, 43,  1, 33,  9, 41,
+    51, 19, 59, 27, 49, 17, 57, 25,
+    15, 47,  7, 39, 13, 45,  5, 37,
+    63, 31, 55, 23, 61, 29, 53, 21
+  ];
+
+  var bgBits = null;      // 打包好的 9600 字节
+  var bgImage = null;     // 原图,拖滑块时不用重新读文件
+
+  function packBits(bits) {
+    var out = new Uint8Array(BG_W * BG_H / 8);
+    for (var i = 0; i < bits.length; i++) {
+      if (bits[i]) out[i >> 3] |= 0x80 >> (i & 7);   // 最高位 = 最左像素
+    }
+    return out;
+  }
+
+  function renderBg() {
+    if (!bgImage) return;
+    var cv = $('bgCanvas'), ctx = cv.getContext('2d');
+    var cover = parseInt($('bgCover').value, 10) / 100;   // 最暗处最多百分之几的墨点
+
+    // cover:短边填满,长边两头裁掉
+    var sc = Math.max(BG_W / bgImage.width, BG_H / bgImage.height);
+    var dw = bgImage.width * sc, dh = bgImage.height * sc;
+    ctx.clearRect(0, 0, BG_W, BG_H);
+    ctx.drawImage(bgImage, (BG_W - dw) / 2, (BG_H - dh) / 2, dw, dh);
+
+    var src = ctx.getImageData(0, 0, BG_W, BG_H).data;
+    var gray = new Uint8Array(BG_W * BG_H);
+    for (var i = 0, p = 0; i < gray.length; i++, p += 4) {
+      gray[i] = ((src[p] * 299 + src[p + 1] * 587 + src[p + 2] * 114) / 1000) | 0;
+    }
+
+    // **按像素概率上墨**,而不是"先算一个全局阈值再二值化"。
+    //
+    // 试过全局阈值(直方图取分位数):暗部会整片压成实心黑,因为一整块
+    // 都比阈值暗,抖不动。背景上出现一块纯黑,字压上去就完了。
+    //
+    // 现在:纯黑的地方最多 cover 的概率上墨,纯白的地方一个点都不上,
+    // 中间线性。于是**最暗处也不会超过 cover**,而 cover 就是那个上限。
+    var bits = new Uint8Array(gray.length);
+    var ink = 0;
+    for (var y = 0; y < BG_H; y++) {
+      for (var x = 0; x < BG_W; x++) {
+        var k = y * BG_W + x;
+        var prob = cover * (1 - gray[k] / 255);
+        var thr = (BAYER[(y & 7) * 8 + (x & 7)] + 0.5) / 64;
+        var on = thr < prob;
+        bits[k] = on ? 1 : 0;
+        if (on) ink++;
+      }
+    }
+
+    // 画回预览:纸色 / 墨色,和卡上那两个调色板项一致
+    var out = ctx.createImageData(BG_W, BG_H), od = out.data;
+    for (var j = 0, q = 0; j < bits.length; j++, q += 4) {
+      if (bits[j]) { od[q] = 0x24; od[q + 1] = 0x23; od[q + 2] = 0x1F; }
+      else          { od[q] = 0xDD; od[q + 1] = 0xCF; od[q + 2] = 0xB0; }
+      od[q + 3] = 255;
+    }
+    ctx.putImageData(out, 0, 0);
+
+    bgBits = packBits(bits);
+    $('bgInk').textContent = Math.round(ink * 100 / bits.length) + '%';
+    $('bgBar').style.width = '0';
+    refreshButtons();
+  }
+
+  function pickBackground(file) {
+    if (!file) return;
+    var img = new Image();
+    img.onload = function () {
+      bgImage = img;
+      renderBg();
+      log('图片读进来了，拖滑块调深浅。');
+    };
+    img.onerror = function () { log('这张图读不出来。', 'bad'); };
+    img.src = URL.createObjectURL(file);
+  }
+
+  async function sendBackground() {
+    return guard(async function () {
+      if (!bgBits) return log('先选一张图片。', 'bad');
+
+      // 每块 52 字节:1 类型 + 2 偏移 + 52 数据 = 55,加长度前缀 56,
+      // 正好等于固件的 CARD_LINK_MAX_FRAME。
+      var CHUNK = 52;
+      await sendFrames([CardFrames.bgBegin(bgBits.length)]);
+
+      for (var off = 0; off < bgBits.length; off += CHUNK) {
+        await sendFrames([CardFrames.bgData(off, bgBits.subarray(off, off + CHUNK))]);
+        // 每 16 块让一次事件循环:不让页面在几秒里完全卡死
+        if ((off / CHUNK) % 16 === 0) {
+          $('bgBar').style.width = Math.round(off * 100 / bgBits.length) + '%';
+          await new Promise(function (r) { setTimeout(r, 0); });
+        }
+      }
+
+      await sendFrames([CardFrames.bgEnd()]);
+      $('bgBar').style.width = '100%';
+      log('背景写进去了。表盘上那张纸已经换了。', 'ok');
+    });
+  }
+
+  function clearBackground() {
+    return guard(async function () {
+      await sendFrames([CardFrames.bgClear()]);
+      bgBits = null;
+      bgImage = null;
+      $('bgInk').textContent = '—';
+      $('bgBar').style.width = '0';
+      $('bgCanvas').getContext('2d').clearRect(0, 0, BG_W, BG_H);
+      refreshButtons();
+      log('背景去掉了，表盘回到纯纸色。', 'ok');
+    });
+  }
+
+  // ---------------------------------------------------------------- 相册
+  //
+  // 网页这边只做三件事:等比裁切到 240×320、转成 RGB565、按 156 字节一块发。
+  // **空间管理不在这里**:卡片那边是固定 31 格,满了直接拒收,不会挤掉旧照片,
+  // 也不会写到分区外面。网页只负责在发之前问一句"还有几格",免得传两分钟
+  // 到一半才被拒。
+  var ALB_W = CardFrames.ALBUM_W;
+  var ALB_H = CardFrames.ALBUM_H;
+  var ALB_BLOCK = CardFrames.ALBUM_BLOCK;
+
+  var albBits = null;     // 打包好的 153 600 字节 RGB565
+  var albImage = null;    // 原图,换裁切不用重新读文件
+  var albCount = -1;      // 卡片里现在几张;-1 = 还没问过
+
+  function albumMeta() {
+    if (albCount < 0) { $('albMeta').textContent = '—'; return; }
+    $('albMeta').textContent = albCount + ' / ' + CardFrames.ALBUM_MAX + ' 张';
+    $('albDelNo').max = String(Math.max(1, albCount));
+  }
+
+  function renderAlbum() {
+    if (!albImage) return;
+    var cv = $('albCanvas'), ctx = cv.getContext('2d');
+
+    // 短边填满,长边两头裁掉 —— 和卡片上显示的方式一致,所见即所得。
+    var sc = Math.max(ALB_W / albImage.width, ALB_H / albImage.height);
+    var dw = albImage.width * sc, dh = albImage.height * sc;
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, ALB_W, ALB_H);
+    ctx.drawImage(albImage, (ALB_W - dw) / 2, (ALB_H - dh) / 2, dw, dh);
+
+    albBits = CardFrames.rgb565(ctx.getImageData(0, 0, ALB_W, ALB_H).data, ALB_W, ALB_H);
+    $('albBar').style.width = '0';
+    $('albHint').textContent = '裁成 240×320 后是 ' +
+      Math.round(albBits.length / 1024) + ' KB。点「写进卡片」开始传，中途别关这个页面。';
+    refreshButtons();
+  }
+
+  function pickAlbum(file) {
+    if (!file) return;
+    var img = new Image();
+    img.onload = function () {
+      albImage = img;
+      renderAlbum();
+      log('照片读进来了，' + img.width + '×' + img.height + '，已经裁成 240×320。');
+    };
+    img.onerror = function () { log('这张图读不出来。', 'bad'); };
+    img.src = URL.createObjectURL(file);
+  }
+
+  async function albumQueryRaw() {
+    var s = await askText(CardFrames.albumQuery(), 'ALBUM ', '相册');
+    var m = /ALBUM\s+(\d+)\s*\/\s*(\d+)/.exec(s);
+    if (m) {
+      albCount = parseInt(m[1], 10);
+      albumMeta();
+      log('卡片里 ' + albCount + ' 张，最多 ' + m[2] + ' 张。', 'ok');
+    }
+    return albCount;
+  }
+
+  function albumQuery() {
+    return guard(function () { return albumQueryRaw(); });
+  }
+
+  function sendAlbum() {
+    return guard(async function () {
+      if (!albBits) return log('先选一张照片。', 'bad');
+
+      // 没问过就先问一句:卡片满了的话,现在说清楚比传两分钟再被拒强。
+      if (albCount < 0) {
+        try { await albumQueryRaw(); } catch (e) { /* 问不到就往下发,卡片自己会拒 */ }
+      }
+      if (albCount >= CardFrames.ALBUM_MAX) {
+        log('卡片相册满了（' + CardFrames.ALBUM_MAX + ' 张）。先删一张再传。', 'bad');
+        return;
+      }
+
+      var total = albBits.length;
+      var crc = CardFrames.crc32(albBits);
+      var before = albCount;
+      var t0 = Date.now();
+      var sent = 0;
+
+      try {
+        await sendFrames([CardFrames.albumBegin(total, ALB_W, ALB_H)]);
+
+        for (var off = 0; off < total; off += ALB_BLOCK) {
+          await sendFrames([CardFrames.albumData(off, albBits.subarray(off, off + ALB_BLOCK))]);
+          sent = off + ALB_BLOCK;
+          if (sent > total) sent = total;
+
+          // 每 4 块让一次事件循环:进度条要动,页面也不能卡死。
+          if ((off / ALB_BLOCK) % 4 === 0) {
+            var pct = sent * 100 / total;
+            var sec = (Date.now() - t0) / 1000;
+            $('albBar').style.width = pct.toFixed(1) + '%';
+            $('albHint').textContent = Math.round(pct) + '% · ' +
+              Math.round(sent / 1024) + '/' + Math.round(total / 1024) + ' KB' +
+              (sec > 2 ? ' · 约剩 ' + Math.max(1, Math.round(sec * (total - sent) / sent)) + ' 秒' : '');
+            await new Promise(function (r) { setTimeout(r, 0); });
+          }
+        }
+
+        await sendFrames([CardFrames.albumEnd(crc)]);
+      } catch (e) {
+        // 半路断了:告诉卡片这次作废,别让它一直以为"正在收照片"。
+        try { await sendFrames([CardFrames.albumAbort()]); } catch (e2) { /* 连接都没了 */ }
+        throw e;
+      }
+
+      $('albBar').style.width = '100%';
+
+      // 卡片对 END 没有单独的回执,所以再问一句张数:数变了才算真存住。
+      // 没变就是 CRC 或长度没对上(半路丢了一块),别报"成功"骗人。
+      albCount = -1;
+      var after = -1;
+      try { after = await albumQueryRaw(); } catch (e) { /* 回执丢了,不影响已经存下的 */ }
+      if (before >= 0 && after >= 0 && after <= before) {
+        log('卡片说这次没收成（CRC 或数据没对齐）。再发一次试试。', 'bad');
+        $('albHint').textContent = '这次没传成。再点一次「写进卡片」。';
+      } else {
+        log('照片写进去了，卡上「相册」最后一张就是它。', 'ok');
+        $('albHint').textContent = '传完了。要换一张，再选一张重发就行。';
+      }
+    });
+  }
+
+  function deleteAlbum() {
+    return guard(async function () {
+      if (albCount <= 0) return log('先点「读一下卡片」，看看里面有几张。', 'bad');
+      var no = parseInt($('albDelNo').value, 10);
+      if (!(no >= 1 && no <= albCount)) {
+        return log('序号要在 1..' + albCount + ' 之间。', 'bad');
+      }
+      await sendFrames([CardFrames.albumDelete(no - 1)]);
+      // 卡片回一行 "DEL OK" / "DEL ERR",等它把目录写完再问总数。
+      await new Promise(function (r) { setTimeout(r, 250); });
+      await albumQueryRaw();
+      log('删掉第 ' + no + ' 张。照片数据留在 flash 里等下次覆盖，不搬不挪。', 'ok');
+    });
+  }
+
+  // ---------------------------------------------------------------- 计数
+  function updateWordCount() {
+    var n = parseWords().length;
+    $('wordCount').textContent = n + ' 个词' + (n >= CardFrames.MAX_WORDS ? '（到上限）' : '');
+  }
+  function updatePeriodCount() {
+    var n = readPeriods().length + readWeek('satGrid').length + readWeek('sunGrid').length;
+    $('periodCount').textContent = n + ' 节';
+  }
+  function updateTodoCount() {
+    var m = todoMask(), n = 0;
+    for (var i = 0; i < 5; i++) if (m & (1 << i)) n++;
+    $('todoCount').textContent = n + ' 件没做';
+  }
+
+  // ---------------------------------------------------------------- 远程控制
+  // 这是"遥控器":屏幕上三个键能到的屏、能开的开关,这里都能触发。
+  // 语音只是它的一个输入方式 —— 识别成文字后,走的还是同一条命令帧。
+  function buildRemote() {
+    var box = $('remoteGrid');
+    REMOTE.forEach(function (it) {
+      var b = document.createElement('button');
+      b.textContent = it[0];
+      b.className = 'ghost';
+      b.dataset.cmd = it[1];
+      b.dataset.arg = it[2];
+      b.addEventListener('click', function () { sendCmd(it[1], it[2], it[0]); });
+      box.appendChild(b);
+    });
+  }
+
+  function sendCmd(id, arg, label) {
+    return guard(async function () {
+      await sendFrames([CardFrames.cmd(id, arg)]);
+      log('遥控 → ' + (label || ('命令 ' + id)), 'ok');
+    });
+  }
+
+  // ---- 语音:浏览器识别成文字,再翻成命令号 ----
+  // 识别在浏览器/云端做,网页只拿到最终文本,拿不到音频 —— 卡上也不会存录音。
+  var recognizer = null;
+
+  function cnNum(str) {
+    if (!str) return 0;
+    if (/^[0-9]+$/.test(str)) return parseInt(str, 10);
+    var d = { '零':0, '一':1, '二':2, '两':2, '三':3, '四':4, '五':5, '六':6, '七':7, '八':8, '九':9 };
+    if (str === '十') return 10;
+    if (str === '一百') return 100;
+    if (str.length === 2 && str[1] === '十') return (d[str[0]] || 0) * 10;
+    if (str.length === 2 && str[0] === '十') return 10 + (d[str[1]] || 0);
+    if (str.length === 3 && str[1] === '十') return (d[str[0]] || 0) * 10 + (d[str[2]] || 0);
+    return d[str] || 0;
+  }
+
+  // 只认"命令",不聊天。命中不了就明确说没听懂,不猜。
+  function parseVoice(text) {
+    var s = String(text).replace(/[\s,，。！!?？]/g, '');
+    var mm = s.match(/([0-9一二两三四五六七八九十]+)分钟/);
+    var minutes = mm ? cnNum(mm[1]) : 0;
+
+    var mv = s.match(/音量([0-9一二两三四五六七八九十百]+)/);
+    if (mv) return [CMD.VOLUME, Math.max(0, Math.min(100, cnNum(mv[1]))), '音量'];
+    var mb = s.match(/亮度([0-9一二两三四五六七八九十百]+)/);
+    if (mb) return [CMD.BRIGHT, Math.max(10, Math.min(100, cnNum(mb[1]))), '亮度'];
+
+    if (/下一首|换一首|切歌/.test(s)) return [CMD.MUSIC_NEXT, 0, '下一首'];
+    if (/番茄|专注|计时/.test(s)) return [CMD.POMO, minutes || 25, '番茄钟'];
+    if (/课表|下一节|什么课/.test(s)) return [CMD.SCHEDULE, 0, '课表'];
+    if (/饭|吃什么/.test(s)) return [CMD.MEAL, 0, '饭表'];
+    if (/单词|背词/.test(s)) return [CMD.WORDS, 0, '背单词'];
+    if (/音乐|放歌|唱歌/.test(s)) return [CMD.MUSIC, 0, '音乐'];
+    if (/找卡|找一下|在哪/.test(s)) return [CMD.FIND, 15, '找卡'];
+    if (/手电|开灯/.test(s)) return [CMD.FLASHLIGHT, 0, '手电筒'];
+    if (/录音/.test(s)) return [CMD.REC, 0, '录音'];
+    if (/噪/.test(s)) return [CMD.NOISE, 0, '噪声计'];
+    if (/呼吸/.test(s)) return [CMD.BREATHE, 0, '呼吸'];
+    if (/秒表/.test(s)) return [CMD.STOPWATCH, 0, '秒表'];
+    if (/息屏|黑屏|关屏/.test(s)) return [CMD.SLEEP, 0, '息屏'];
+    if (/状态/.test(s)) return [CMD.STATUS, 0, '换状态'];
+    if (/设置/.test(s)) return [CMD.SETTINGS, 0, '设置'];
+    if (/名片/.test(s)) return [CMD.GALLERY, 0, '名片'];
+    if (/菜单/.test(s)) return [CMD.MENU, 0, '菜单'];
+    if (/首页|表盘|回去/.test(s)) return [CMD.HOME, 0, '表盘'];
+    return null;
+  }
+
+  function runVoice(text) {
+    var hit = parseVoice(text);
+    if (!hit) {
+      $('voiceState').textContent =
+        '没听懂「' + text + '」。可以试：课表 / 饭表 / 番茄钟二十五分钟 / 音乐 / 找卡';
+      return;
+    }
+    sendCmd(hit[0], hit[1], hit[2]);
+  }
+
+  function initVoice() {
+    var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) {
+      $('voiceBtn').disabled = true;
+      $('voiceState').textContent = '这个浏览器不支持语音识别（Chrome / Edge 可以）';
+      return;
+    }
+    recognizer = new SR();
+    recognizer.lang = 'zh-CN';
+    recognizer.interimResults = false;
+    recognizer.maxAlternatives = 1;
+    recognizer.onresult = function (e) {
+      var t = e.results[0][0].transcript.trim();
+      $('voiceState').textContent = '听到：' + t;
+      runVoice(t);
+    };
+    recognizer.onerror = function (e) {
+      $('voiceState').textContent = '没听清（' + e.error + '），再试一次';
+    };
+    recognizer.onend = function () { $('voiceBtn').textContent = '🎤 说一句'; };
+  }
+
+  function voiceOnce() {
+    if (!recognizer) return;
+    $('voiceBtn').textContent = '听着…';
+    try { recognizer.start(); } catch (e) { /* 已经在听,忽略 */ }
+  }
+
+  // ---------------------------------------------------------------- 演示预设
+  // 和固件 card_defaults.c 同一份内容:8 节课 + 周六 4 节 + 周日 2 节 +
+  // 七天饭表 + 8 个词 + 2 件待办。演示前点一下,不用手填。
+  function fillPreset() {
+    $('pname').value = '林小满';
+    $('pclass').value = '高二(3)班';
+    $('pno').value = '0421';
+    $('pslogan').value = '今天也要加油';
+    fillPeriods(DEFAULT_PERIODS);
+    fillWeek('satGrid', DEFAULT_WEEK_SAT);
+    fillWeek('sunGrid', DEFAULT_WEEK_SUN);
+    fillMeals(DEFAULT_MEALS);
+    $('words').value = PRESET_WORDS;
+    todoSet(2);
+    updateWordCount();
+    updatePeriodCount();
+    updateMealCount();
+    save();
+    $('presetState').textContent = '已填好，点「全部写进卡片」';
+    log('预设已填入：8 节 + 周六 4 节 + 周日 2 节 + 7 天饭表 + 8 个词 + 2 件待办', 'ok');
+  }
+
+  // ---------------------------------------------------------------- 名片墙
+  //
+  // 卡上的名片夹是"翻着看"的:一屏一张,上下翻。到了手机上它可以一次全摊开——
+  // 而且能存成一张图发出去。这是这一版加它的理由:
+  // 收集这件事,只有"能给别人看"的时候才成立。
+  var wallRecs = null, wallSum = null;
+  var WALL_RGB = ['#F7F4EA', '#24231F', '#B5502F', '#2F6F5E'];
+
+  function paintAvatar(cv, cells, px) {
+    cv.width = 12 * px;
+    cv.height = 12 * px;
+    var ctx = cv.getContext('2d');
+    for (var i = 0; i < cells.length; i++) {
+      ctx.fillStyle = WALL_RGB[cells[i] & 3];
+      ctx.fillRect((i % 12) * px, Math.floor(i / 12) * px, px, px);
+    }
+  }
+
+  // 合章只有 1 = 有墨;0 要透出底色,不能刷成纸色(那会把格子画成一整块)。
+  function paintSigil(cv, cells, px) {
+    cv.width = 5 * px;
+    cv.height = 5 * px;
+    var ctx = cv.getContext('2d');
+    for (var i = 0; i < cells.length; i++) {
+      if (!cells[i]) continue;
+      ctx.fillStyle = WALL_RGB[1];
+      ctx.fillRect((i % 5) * px, Math.floor(i / 5) * px, px, px);
+    }
+  }
+
+  async function readWall() {
+    if (!rx || !tx) throw new Error('还没连上卡片');
+    var sum = await ask(CardFrames.meetSummary(), 8, '名片夹摘要');
+    if (sum[0] !== 0x4D || sum[1] !== 0x57) throw new Error('回执不是名片夹（固件版本对不上）');
+    var count = sum[3];
+    var recs = [];
+    for (var i = 0; i < count; i++) {
+      var b = await ask(CardFrames.meetItem(i), 21, '第 ' + (i + 1) + ' 个人');
+      recs.push(CardWall.parseRec(b));
+    }
+    wallRecs = recs;
+    wallSum = { count: count, total: sum[4] | (sum[5] << 8), repeat: sum[6] | (sum[7] << 8) };
+    renderWall();
+    log('读到 ' + count + ' 个人（累计 ' + wallSum.total + ' 次）。', 'ok');
+  }
+
+  function renderWall() {
+    var grid = $('wallGrid');
+    grid.innerHTML = '';
+    var n = wallRecs ? wallRecs.length : 0;
+
+    for (var i = 0; i < 16; i++) {
+      var cell = document.createElement('div');
+      cell.className = 'wallcell' + (i < n ? '' : ' empty');
+      var cv = document.createElement('canvas');
+      cell.appendChild(cv);
+
+      if (i < n) {
+        var r = wallRecs[i];
+        paintAvatar(cv, CardWall.avatarSt(r.seed, r.status), 6);
+        var nb = document.createElement('b');
+        // 名字只有"他自己说的"才算。没有就写"（未署名）"——
+        // 以前这里会按 id 现算一个代号,读起来像名字,其实是编的。
+        nb.textContent = r.name || '（未署名）';
+        var sp = document.createElement('span');
+        sp.textContent = '章 ' + (r.emblem + 1) + ' · ' + CardWall.seenText(r.seen);
+        if (r.count > 0) sp.textContent += ' · 第 ' + (r.count + 1) + ' 次';
+        cell.appendChild(nb);
+        cell.appendChild(sp);
+      } else {
+        cv.width = 72;
+        cv.height = 72;
+        var eb = document.createElement('b');
+        eb.textContent = '空位';
+        var es = document.createElement('span');
+        es.textContent = '—';
+        cell.appendChild(eb);
+        cell.appendChild(es);
+      }
+      grid.appendChild(cell);
+    }
+
+    if (!n) {
+      $('wallMeta').textContent = '名片夹是空的。在卡上长按上键展示名片，别人路过就会记下一个人。';
+    } else {
+      $('wallMeta').innerHTML = '已遇见 <b>' + wallSum.count + '</b> 人 · 累计 <b>' +
+        wallSum.total + '</b> 次 · 再遇见 <b>' + wallSum.repeat + '</b> 次';
+    }
+    refreshButtons();
+  }
+
+  // 存成一张图:这是"名片墙"真正的用处——能发到班级群里。
+  function saveWall() {
+    if (!wallRecs || !wallRecs.length) return;
+
+    var cv = $('wallCanvas');
+    var cols = 4, cellW = 180, cellH = 212, foot = 78;
+    var rows = Math.ceil(wallRecs.length / cols);
+    cv.width = cols * cellW;
+    cv.height = 124 + rows * cellH + foot;
+
+    var ctx = cv.getContext('2d');
+    ctx.fillStyle = '#F7F4EA';
+    ctx.fillRect(0, 0, cv.width, cv.height);
+
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#24231F';
+    ctx.font = '600 34px "PingFang SC", "Microsoft YaHei", sans-serif';
+    ctx.fillText('名片墙', 30, 58);
+    ctx.font = '15px "PingFang SC", "Microsoft YaHei", sans-serif';
+    ctx.fillStyle = '#6E6A5F';
+    ctx.fillText('已遇见 ' + wallSum.count + ' 人 · 累计 ' + wallSum.total + ' 次 · 再遇见 ' +
+                 wallSum.repeat + ' 次', 30, 90);
+
+    for (var i = 0; i < wallRecs.length; i++) {
+      var r = wallRecs[i];
+      var cx = (i % cols) * cellW;
+      var cy = 124 + Math.floor(i / cols) * cellH;
+      var px = 8;                                  // 12×12 × 8 = 96
+
+      var av = document.createElement('canvas');
+      paintAvatar(av, CardWall.avatarSt(r.seed, r.status), px);
+      ctx.drawImage(av, cx + (cellW - 96) / 2, cy + 6);
+
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#24231F';
+      ctx.font = '600 16px "PingFang SC", "Microsoft YaHei", sans-serif';
+      ctx.fillText(r.name || '（未署名）', cx + cellW / 2, cy + 130);
+
+      ctx.fillStyle = '#6E6A5F';
+      ctx.font = '12px "PingFang SC", "Microsoft YaHei", sans-serif';
+      ctx.fillText('合章 ' + (r.emblem + 1) + ' 号', cx + cellW / 2, cy + 152);
+
+      var sg = document.createElement('canvas');
+      paintSigil(sg, CardWall.sigil(r.emblem), 6);
+      ctx.drawImage(sg, cx + (cellW - 30) / 2, cy + 158);
+
+      ctx.fillStyle = '#8A8478';
+      ctx.font = '11px "PingFang SC", "Microsoft YaHei", sans-serif';
+      ctx.fillText(CardWall.seenText(r.seen), cx + cellW / 2, cy + 204);
+    }
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#6E6A5F';
+    ctx.font = '14px "PingFang SC", "Microsoft YaHei", sans-serif';
+    ctx.fillText('校园卡 · 长按上键展示名片', cv.width / 2, cv.height - 30);
+
+    var a = document.createElement('a');
+    a.download = '名片墙-' + new Date().toISOString().slice(0, 10) + '.png';
+    a.href = cv.toDataURL('image/png');
+    a.click();
+    log('已存成一张图：' + a.download, 'ok');
+  }
+
+  // ---------------------------------------------------------------- 绑定
+  function bind() {
+    if (!navigator.bluetooth) {
+      $('unsupported').hidden = false;
+      $('connect').disabled = true;
+    }
+
+    $('connect').addEventListener('click', connect);
+    $('disconnect').addEventListener('click', function () {
+      if (device && device.gatt.connected) device.gatt.disconnect();
+    });
+
+    $('sendAll').addEventListener('click', sendAll);
+    $('sendWords').addEventListener('click', sendWords);
+    $('sendPeriods').addEventListener('click', sendPeriods);
+    $('sendTodo').addEventListener('click', sendTodo);
+    $('syncTime').addEventListener('click', syncTime);
+    $('findMe').addEventListener('click', findMe);
+    $('clearWords').addEventListener('click', clearWords);
+    $('sendProfile').addEventListener('click', sendProfile);
+    $('sendMeals').addEventListener('click', sendMeals);
+    $('bgPick').addEventListener('click', function () { $('bgFile').click(); });
+    $('bgFile').addEventListener('change', function (e) {
+      pickBackground(e.target.files && e.target.files[0]);
+    });
+    $('bgCover').addEventListener('input', renderBg);
+    $('bgSend').addEventListener('click', sendBackground);
+    $('bgClear').addEventListener('click', clearBackground);
+    $('albPick').addEventListener('click', function () { $('albFile').click(); });
+    $('albFile').addEventListener('change', function (e) {
+      pickAlbum(e.target.files && e.target.files[0]);
+    });
+    $('albSend').addEventListener('click', sendAlbum);
+    $('albDel').addEventListener('click', deleteAlbum);
+    $('albRefresh').addEventListener('click', albumQuery);
+    $('clearMeals').addEventListener('click', clearMeals);
+    $('wallRead').addEventListener('click', function () {
+      guard(readWall);
+    });
+    $('wallSave').addEventListener('click', saveWall);
+    $('fillPreset').addEventListener('click', fillPreset);
+    $('voiceBtn').addEventListener('click', voiceOnce);
+    buildRemote();
+    initVoice();
+
+    // 画板和件数在页面一打开就要准备好:它们和蓝牙连没连没关系。
+    faceInit();
+    // 名片墙也一样:先摆出 16 个空位,面板才"自己说明白"是干什么的。
+    renderWall();
+    $('todoMinus').addEventListener('click', function () { todoSet(todoN - 1); });
+    $('todoPlus').addEventListener('click', function () { todoSet(todoN + 1); });
+    try { todoSet(Number(localStorage.getItem('passport.todo')) || 0); } catch (e) { todoSet(0); }
+
+    // 三个输入框边打边存:手机浏览器随时可能被杀,丢一次输入很烦。
+    ['pname', 'pclass', 'pno', 'pslogan'].forEach(function (id) {
+      $(id).addEventListener('input', function () { save(); $('pstate').textContent = ''; });
+    });
+    $('words').addEventListener('input', function () { updateWordCount(); save(); });
+    // 表格是动态生成的,所以用委托:一个监听管住所有格子。
+    $('periodGrid').addEventListener('input', function () { updatePeriodCount(); save(); });
+    $('periodGrid').addEventListener('change', function () { updatePeriodCount(); save(); });
+    // 周末两张表同样用委托,分开挂:它们的选择器只在自己那张表里找。
+    ['satGrid', 'sunGrid'].forEach(function (id) {
+      $(id).addEventListener('input', function () { updatePeriodCount(); save(); });
+      $(id).addEventListener('change', function () { updatePeriodCount(); save(); });
+    });
+    $('mealGrid').addEventListener('input', function () { updateMealCount(); save(); });
+
+
+    $('pick').addEventListener('click', function () { $('file').click(); });
+    $('file').addEventListener('change', function (e) {
+      var f = e.target.files && e.target.files[0];
+      if (!f) return;
+      var r = new FileReader();
+      r.onload = function () {
+        $('words').value = String(r.result || '');
+        updateWordCount();
+        save();
+        log('读入 ' + f.name);
+      };
+      r.readAsText(f, 'utf-8');
+    });
+
+    // 上次写的内容要读回来。save() 一直在存，但以前没人调 load()——
+    // 换台设备、关一次浏览器，填好的词表和课表就"消失"了。
+    buildPeriodGrid();
+    buildWeekGrid('satGrid');
+    buildWeekGrid('sunGrid');
+    buildMealGrid();
+    if (!load()) {
+      // 第一次打开:铺出厂内容,并立刻存下来(下次就不算第一次了)。
+      fillPeriods(DEFAULT_PERIODS);
+      fillWeek('satGrid', DEFAULT_WEEK_SAT);
+      fillWeek('sunGrid', DEFAULT_WEEK_SUN);
+      fillMeals(DEFAULT_MEALS);
+      save();
+    }
+    updateWordCount();
+    updatePeriodCount();
+    updateMealCount();
+}
+
+  bind();
+})();
+</script>
+</body>
+</html>
