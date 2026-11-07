@@ -144,10 +144,11 @@
   /* ---------------------------------------------------------------- 相册 */
   .meter { height: 6px; border-radius: 999px; background: var(--rule); overflow: hidden; margin: 0 2px 14px; }
   .meter > i { display: block; height: 100%; width: 0; background: var(--teal); border-radius: 999px; transition: width .3s; }
-  .albumwrap { display: grid; grid-template-columns: 132px 1fr; gap: 14px; align-items: start; }
+  .albumwrap { display: grid; grid-template-columns: 1fr; gap: 12px; align-items: start; }
   .albpreview {
     position: relative; border-radius: 10px; overflow: hidden; background: #14130F;
     aspect-ratio: 3 / 4; border: 1px solid var(--rule); cursor: pointer;
+    width: 100%; max-width: 208px; margin: 0 auto;
   }
   .albpreview canvas { width: 100%; height: 100%; display: block; }
   .albpreview.over { outline: 2px dashed var(--teal); outline-offset: 2px; }
@@ -158,9 +159,17 @@
   }
   .dropmask small { font-size: 10px; opacity: .75; }
   .dropmask.hide { display: none; }
+  .d-mobile { display: none; }
+  @media (max-width: 699px) {
+    .d-desktop { display: none; }
+    .d-mobile { display: inline; }
+  }
   .albctrl { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
   .albctrl .btn { width: 100%; white-space: normal; }
-  @media (min-width: 700px) { .albumwrap { grid-template-columns: 200px 1fr; } }
+  @media (min-width: 700px) {
+    .albumwrap { grid-template-columns: 200px 1fr; gap: 14px; }
+    .albpreview { max-width: none; margin: 0; }
+  }
   @media (min-width: 1100px) { .albumwrap { grid-template-columns: 220px 1fr; } }
 
   .slothead {
@@ -186,7 +195,7 @@
   .slot.sel { outline: 2px solid var(--red); outline-offset: 2px; }
   .delbar {
     display: flex; align-items: center; gap: 8px; margin-top: 12px;
-    padding: 10px 12px; border-radius: 11px;
+    padding: 10px 12px; border-radius: 11px; flex-wrap: wrap;
     background: #FBF0EC; border: 1px solid rgba(181,80,47,.25);
   }
   .delbar[hidden] { display: none; }
@@ -380,7 +389,12 @@
         <div class="albumwrap">
           <div class="albpreview" id="albPreview">
             <canvas id="albCanvas" width="240" height="320"></canvas>
-            <div class="dropmask" id="albDrop">拖照片到这里<small>或点下方按钮选图</small></div>
+            <div class="dropmask" id="albDrop">
+              <span class="d-desktop">拖照片到这里</span>
+              <small class="d-desktop">或点下方按钮选图</small>
+              <span class="d-mobile">点这里选照片</span>
+              <small class="d-mobile">从手机相册里挑</small>
+            </div>
           </div>
           <div class="albctrl">
             <button id="albPick" class="btn primary">选一张照片</button>
@@ -1734,7 +1748,7 @@ subtle,微妙的"></textarea>
     }
     $('albMeter').style.width = (n / max * 100).toFixed(1) + '%';
     $('albSlotHint').textContent = albCount < 0
-      ? '先点「读取卡片里现有照片」'
+      ? '先点「读取卡片」'
       : (n === 0 ? '卡片里还没有照片' : '点一格选中，再确认删除');
   }
 
@@ -1878,7 +1892,7 @@ subtle,微妙的"></textarea>
 
   function deleteAlbum() {
     return guard(async function () {
-      if (albCount <= 0) return log('先点「读一下卡片」，看看里面有几张。', 'bad');
+      if (albCount <= 0) return log('先点「读取卡片」，看看里面有几张。', 'bad');
       var no = parseInt($('albDelNo').value, 10);
       if (!(no >= 1 && no <= albCount)) {
         return log('序号要在 1..' + albCount + ' 之间。', 'bad');
