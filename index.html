@@ -937,8 +937,35 @@ subtle,微妙的"></textarea>
   }
 
   // ---------------------------------------------------------------- 连接
+
+  // Web Bluetooth 能不能用，要分两种情况说清楚：浏览器根本没有这个 API，
+  // 和页面不是安全上下文（http://）。后者在电脑上打开本地文件时最常见 ——
+  // navigator.bluetooth 可能存在，但 requestDevice 会直接抛 SecurityError。
+  function btProblem() {
+    if (!navigator.bluetooth) {
+      return '这个浏览器不支持 Web Bluetooth，没法连卡片。Android 用 Chrome，iPhone 用 Bluefy（Safari 不行）。';
+    }
+    if (!window.isSecureContext) {
+      return '当前页面不是 HTTPS，浏览器不允许发起蓝牙连接。请用 https:// 打开这个页面（localhost 除外）。';
+    }
+    return '';
+  }
+
+  function showBtProblem(msg) {
+    var u = $('unsupported');
+    if (!u) return;
+    u.hidden = false;
+    u.textContent = msg;
+    if (u.scrollIntoView) u.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
   async function connect() {
-    if (!navigator.bluetooth) return;
+    var why = btProblem();
+    if (why) {
+      showBtProblem(why);
+      log(why, 'bad');
+      return;
+    }
     try {
       log('正在找卡片（先在卡上打开「连手机」）…');
       device = await navigator.bluetooth.requestDevice({
@@ -1748,7 +1775,7 @@ subtle,微妙的"></textarea>
     }
     $('albMeter').style.width = (n / max * 100).toFixed(1) + '%';
     $('albSlotHint').textContent = albCount < 0
-      ? '先点「读取卡片」'
+      ? '先点「读取卡片里现有照片」'
       : (n === 0 ? '卡片里还没有照片' : '点一格选中，再确认删除');
   }
 
@@ -1892,7 +1919,7 @@ subtle,微妙的"></textarea>
 
   function deleteAlbum() {
     return guard(async function () {
-      if (albCount <= 0) return log('先点「读取卡片」，看看里面有几张。', 'bad');
+      if (albCount <= 0) return log('先点「读一下卡片」，看看里面有几张。', 'bad');
       var no = parseInt($('albDelNo').value, 10);
       if (!(no >= 1 && no <= albCount)) {
         return log('序号要在 1..' + albCount + ' 之间。', 'bad');
@@ -2208,8 +2235,9 @@ subtle,微妙的"></textarea>
 
   // ---------------------------------------------------------------- 绑定
   function bind() {
-    if (!navigator.bluetooth) {
-      $('unsupported').hidden = false;
+    var why = btProblem();
+    if (why) {
+      showBtProblem(why);
       $('connect').disabled = true;
     }
 
