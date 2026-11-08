@@ -188,6 +188,9 @@
     border: 1px solid transparent; color: #EDE7D8; cursor: pointer;
     background: linear-gradient(160deg, #3A3833, #22211D);
     user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+    /* 关键:格子上不让浏览器自己滚。否则手指一移动,浏览器就把手势收走、
+       发一个 pointercancel,拖动刚起来就断了。页面滚动改由脚本接管。 */
+    touch-action: none;
   }
   .slot.full::after {
     content: ''; position: absolute; inset: 0; border-radius: 8px;
@@ -207,7 +210,7 @@
   .dragghost {
     position: fixed; left: 0; top: 0; z-index: 90; margin: 0;
     pointer-events: none; box-shadow: 0 12px 26px rgba(34,33,29,.32);
-    transform: translate(0, 0);
+    transform: translate(0, 0); will-change: transform;
   }
 
   /* ---------------------------------------------------------------- 表单 */
@@ -1940,10 +1943,15 @@ subtle,微妙的"></textarea>
   }
 
   // ---- 拖动换位置 ----
-  // 手机上没有原生拖放,所以用指针事件自己做:按住 160 ms 把格子"拿起来",
-  // 跟着手指走,松手落在哪一格就挪到哪一格。轻点不动仍然是选中(为了删除)。
+  // 手机上没有原生拖放,只能用指针事件自己做。格子设了 touch-action:none,
+  // 浏览器就不会把手势抢去滚页面 —— 代价是滚动也得自己接管:
+  //   · 按住不动约 140 ms:把格子"拿起来",之后跟着手指走
+  //   · 一碰就上下滑:当成滚页面,按位移自己滚(不然在格子上就滑不动了)
+  //   · 轻点不动:交给 click,还是选中(为了删除)
   var drag = null;
   var dragEndedAt = 0;
+  var LIFT_MS = 140;
+  var TAP_SLOP = 12;
 
   function slotAt(x, y) {
     var el = document.elementFromPoint(x, y);
@@ -1953,7 +1961,7 @@ subtle,微妙的"></textarea>
   function placeGhost(x, y) {
     if (!drag || !drag.ghost) return;
     drag.ghost.style.transform =
-      'translate(' + (x - drag.dx) + 'px,' + (y - drag.dy) + 'px)';
+      'translate(' + (x - drag.dx) + 'px,' + (y - drag.dy) + 'px) scale(1.06)';
   }
 
   function markOver(cell) {
@@ -1965,7 +1973,7 @@ subtle,微妙的"></textarea>
   }
 
   function liftCell() {
-    if (!drag || drag.active) return;
+    if (!drag || drag.active || !drag.canDrag) return;
     drag.active = true;
     var g = document.createElement('div');
     g.className = 'slot full dragghost';
@@ -1977,6 +1985,22 @@ subtle,微妙的"></textarea>
     drag.cell.classList.add('lift');
     if (navigator.vibrate) navigator.vibrate(8);
     placeGhost(drag.x, drag.y);
+    markOver(slotAt(drag.x, drag.y));
+  }
+
+  // 松手后按惯性再滑一段,不然在格子上滚起来很涩。
+  var flingRaf = 0;
+
+  function fling(v) {
+    if (!v || Math.abs(v) < 0.3) return;
+    cancelAnimationFrame(flingRaf);
+    function step() {
+      v *= 0.94;
+      if (Math.abs(v) < 0.4) return;
+      window.scrollBy(0, -v);
+      flingRaf = requestAnimationFrame(step);
+    }
+    flingRaf = requestAnimationFrame(step);
   }
 
   function endDrag(commit) {
@@ -1997,40 +2021,65 @@ subtle,微妙的"></textarea>
 
   function bindDrag() {
     var grid = $('albSlots');
+
     grid.addEventListener('pointerdown', function (e) {
-      if (!(rx && !busy) || !(albCount > 1) || e.button > 0) return;
+      if (e.button > 0) return;
       var cell = e.target.closest ? e.target.closest('.slot.full') : null;
       if (!cell) return;
+      // 格子上的原生滚动被 touch-action:none 关掉了,所以不管能不能拖,
+      // 都要在这里接住手势 —— 不能拖的时候至少还得能滚。
+      var canDrag = rx && !busy && albCount > 1;
+      cancelAnimationFrame(flingRaf);
       var r = cell.getBoundingClientRect();
       drag = {
-        cell: cell, id: e.pointerId, x0: e.clientX, y0: e.clientY,
-        x: e.clientX, y: e.clientY,
+        cell: cell, id: e.pointerId, canDrag: canDrag,
+        x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY,
+        lastY: e.clientY, lastT: performance.now(), vy: 0, moved: 0,
         dx: e.clientX - r.left, dy: e.clientY - r.top,
         w: r.width, h: r.height, active: false, ghost: null,
       };
-      drag.timer = setTimeout(liftCell, 160);
+      drag.timer = canDrag ? setTimeout(liftCell, LIFT_MS) : 0;
     });
 
     window.addEventListener('pointermove', function (e) {
       if (!drag || e.pointerId !== drag.id) return;
-      drag.x = e.clientX;
-      drag.y = e.clientY;
-      if (!drag.active) {
-        // 手指一上来就在滑,那是想滚页面,别拦着
-        if (Math.abs(e.clientX - drag.x0) > 12 || Math.abs(e.clientY - drag.y0) > 12) endDrag(false);
+      var d = drag;
+      d.x = e.clientX;
+      d.y = e.clientY;
+      d.moved = Math.max(d.moved, Math.abs(e.clientX - d.x0) + Math.abs(e.clientY - d.y0));
+
+      if (!d.active) {
+        if (d.moved > TAP_SLOP) {
+          clearTimeout(d.timer);
+          d.timer = 0;
+          var dy = d.lastY - e.clientY;
+          if (dy) window.scrollBy(0, dy);
+          var now = performance.now();
+          var dt = Math.max(8, now - d.lastT);
+          d.vy = (e.clientY - d.lastY) / dt * 16;
+          d.lastT = now;
+        }
+        d.lastY = e.clientY;
         return;
       }
+
       if (e.cancelable) e.preventDefault();
-      placeGhost(drag.x, drag.y);
-      markOver(slotAt(drag.x, drag.y));
-      if (drag.y < 80) window.scrollBy(0, -9);
-      else if (drag.y > window.innerHeight - 80) window.scrollBy(0, 9);
+      placeGhost(d.x, d.y);
+      markOver(slotAt(d.x, d.y));
+      if (d.y < 90) window.scrollBy(0, -10);
+      else if (d.y > window.innerHeight - 90) window.scrollBy(0, 10);
     }, { passive: false });
 
     window.addEventListener('pointerup', function (e) {
       if (!drag || e.pointerId !== drag.id) return;
+      // 刚才是滑页面,不是点击:松手后按最后的速度滑一段,不然滚起来发涩
+      if (!drag.active && drag.moved > TAP_SLOP) {
+        dragEndedAt = Date.now();
+        fling(drag.vy);
+      }
       endDrag(true);
     });
+
     window.addEventListener('pointercancel', function (e) {
       if (!drag || e.pointerId !== drag.id) return;
       endDrag(false);
