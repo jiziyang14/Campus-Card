@@ -187,6 +187,7 @@
   .slot.full {
     border: 1px solid transparent; color: #EDE7D8; cursor: pointer;
     background: linear-gradient(160deg, #3A3833, #22211D);
+    user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
   }
   .slot.full::after {
     content: ''; position: absolute; inset: 0; border-radius: 8px;
@@ -200,14 +201,13 @@
   }
   .delbar[hidden] { display: none; }
   .delbar span { flex: 0 0 auto; font-size: 13px; color: var(--red); }
-  .delbar .movebox {
-    display: inline-flex; align-items: center; gap: 4px;
-    font-size: 12px; color: var(--muted); white-space: nowrap;
-  }
-  .delbar .movebox input {
-    width: 52px; padding: 4px 6px; font: inherit; font-size: 12px;
-    border: 1px solid var(--rule); border-radius: 7px;
-    background: #fff; color: var(--ink);
+  /* 拖动:拿起来的那格变淡,跟着手指走的那块浮在最上面,落点用青线标出来 */
+  .slot.lift { opacity: .3; }
+  .slot.over { outline: 2px solid var(--teal); outline-offset: 2px; }
+  .dragghost {
+    position: fixed; left: 0; top: 0; z-index: 90; margin: 0;
+    pointer-events: none; box-shadow: 0 12px 26px rgba(34,33,29,.32);
+    transform: translate(0, 0);
   }
 
   /* ---------------------------------------------------------------- 表单 */
@@ -423,9 +423,6 @@
 
         <div class="delbar" id="albDelBar" hidden>
           <span id="albDelText">第 1 张</span>
-          <label class="movebox">移到第
-            <input id="albMoveNo" type="number" min="1" value="1"> 张</label>
-          <button id="albMove" class="btn sm" disabled>移动</button>
           <button id="albDel" class="btn danger sm" disabled>删除</button>
           <button id="albCancel" class="btn ghost sm">取消</button>
         </div>
@@ -818,7 +815,6 @@ subtle,微妙的"></textarea>
     $('bgClear').disabled = !on;
     $('albSend').disabled = !on || !albBits;
     $('albDel').disabled = !on || !(albCount > 0);
-    $('albMove').disabled = !on || !(albCount > 1);
     $('albRefresh').disabled = !on;
     $('clearMeals').disabled = !on;
     $('wallRead').disabled = !on;
@@ -1762,7 +1758,6 @@ subtle,微妙的"></textarea>
     }
     $('albMeta').textContent = albCount + ' / ' + CardFrames.ALBUM_MAX + ' 张';
     $('albDelNo').max = String(Math.max(1, albCount));
-    $('albMoveNo').max = String(Math.max(1, albCount));
     renderAlbumSlots();
   }
 
@@ -1790,20 +1785,19 @@ subtle,微妙的"></textarea>
     $('albMeter').style.width = (n / max * 100).toFixed(1) + '%';
     $('albSlotHint').textContent = albCount < 0
       ? '先点「读取卡片里现有照片」'
-      : (n === 0 ? '卡片里还没有照片' : '点一格选中，可以换位置或删掉');
+      : (n === 0 ? '卡片里还没有照片' : '按住一格拖到别处就能换位置，轻点选中可以删除');
   }
 
   function selectAlbumSlot(no) {
+    if (Date.now() - dragEndedAt < 350) return;   // 刚拖完那一下不算点击
     var cells = document.querySelectorAll('#albSlots .slot');
     for (var i = 0; i < cells.length; i++) {
       cells[i].classList.toggle('sel', cells[i].dataset.no === no);
     }
     $('albDelNo').value = no;
-    $('albMoveNo').value = no;
     $('albDelText').textContent = '第 ' + no + ' 张';
     $('albDelBar').hidden = false;
     $('albDel').disabled = !(rx && !busy);
-    $('albMove').disabled = !(rx && !busy) || !(albCount > 1);
   }
 
   function clearAlbumSel() {
@@ -1933,21 +1927,113 @@ subtle,微妙的"></textarea>
     });
   }
 
-  function moveAlbum() {
+  function movePhoto(from, to) {
+    if (!(from >= 1 && from <= albCount) || !(to >= 1 && to <= albCount) || from === to) return;
     return guard(async function () {
-      if (!(albCount > 1)) return log('至少两张才谈得上换位置。', 'bad');
-      var from = parseInt($('albDelNo').value, 10);
-      var to = parseInt($('albMoveNo').value, 10);
-      if (!(from >= 1 && from <= albCount) || !(to >= 1 && to <= albCount)) {
-        return log('位置要在 1..' + albCount + ' 之间。', 'bad');
-      }
-      if (from === to) return log('它本来就在第 ' + to + ' 张。', 'bad');
       await sendFrames([CardFrames.albumMove(from - 1, to - 1)]);
       // 卡片只改目录、不搬照片,写完索引就回 "MOVE OK",稍等一下再问总数。
       await new Promise(function (r) { setTimeout(r, 250); });
       await albumQueryRaw();
       clearAlbumSel();
-      log('第 ' + from + ' 张挪到了第 ' + to + ' 张。卡片上照片数据没动，只是顺序变了。', 'ok');
+      log('第 ' + from + ' 张挪到了第 ' + to + ' 张。卡片上的照片没重传，只是顺序变了。', 'ok');
+    });
+  }
+
+  // ---- 拖动换位置 ----
+  // 手机上没有原生拖放,所以用指针事件自己做:按住 160 ms 把格子"拿起来",
+  // 跟着手指走,松手落在哪一格就挪到哪一格。轻点不动仍然是选中(为了删除)。
+  var drag = null;
+  var dragEndedAt = 0;
+
+  function slotAt(x, y) {
+    var el = document.elementFromPoint(x, y);
+    return el && el.closest ? el.closest('#albSlots .slot.full') : null;
+  }
+
+  function placeGhost(x, y) {
+    if (!drag || !drag.ghost) return;
+    drag.ghost.style.transform =
+      'translate(' + (x - drag.dx) + 'px,' + (y - drag.dy) + 'px)';
+  }
+
+  function markOver(cell) {
+    var cells = document.querySelectorAll('#albSlots .slot.over');
+    for (var i = 0; i < cells.length; i++) {
+      if (cells[i] !== cell) cells[i].classList.remove('over');
+    }
+    if (cell && cell !== drag.cell) cell.classList.add('over');
+  }
+
+  function liftCell() {
+    if (!drag || drag.active) return;
+    drag.active = true;
+    var g = document.createElement('div');
+    g.className = 'slot full dragghost';
+    g.textContent = drag.cell.textContent;
+    g.style.width = drag.w + 'px';
+    g.style.height = drag.h + 'px';
+    document.body.appendChild(g);
+    drag.ghost = g;
+    drag.cell.classList.add('lift');
+    if (navigator.vibrate) navigator.vibrate(8);
+    placeGhost(drag.x, drag.y);
+  }
+
+  function endDrag(commit) {
+    if (!drag) return;
+    var d = drag;
+    drag = null;
+    clearTimeout(d.timer);
+    if (!d.active) return;                 // 没拿起来就是轻点,交给 click
+    dragEndedAt = Date.now();
+    if (d.ghost && d.ghost.parentNode) d.ghost.parentNode.removeChild(d.ghost);
+    d.cell.classList.remove('lift');
+    markOver(null);
+    var t = commit ? slotAt(d.x, d.y) : null;
+    if (t && t !== d.cell) {
+      movePhoto(parseInt(d.cell.dataset.no, 10), parseInt(t.dataset.no, 10));
+    }
+  }
+
+  function bindDrag() {
+    var grid = $('albSlots');
+    grid.addEventListener('pointerdown', function (e) {
+      if (!(rx && !busy) || !(albCount > 1) || e.button > 0) return;
+      var cell = e.target.closest ? e.target.closest('.slot.full') : null;
+      if (!cell) return;
+      var r = cell.getBoundingClientRect();
+      drag = {
+        cell: cell, id: e.pointerId, x0: e.clientX, y0: e.clientY,
+        x: e.clientX, y: e.clientY,
+        dx: e.clientX - r.left, dy: e.clientY - r.top,
+        w: r.width, h: r.height, active: false, ghost: null,
+      };
+      drag.timer = setTimeout(liftCell, 160);
+    });
+
+    window.addEventListener('pointermove', function (e) {
+      if (!drag || e.pointerId !== drag.id) return;
+      drag.x = e.clientX;
+      drag.y = e.clientY;
+      if (!drag.active) {
+        // 手指一上来就在滑,那是想滚页面,别拦着
+        if (Math.abs(e.clientX - drag.x0) > 12 || Math.abs(e.clientY - drag.y0) > 12) endDrag(false);
+        return;
+      }
+      if (e.cancelable) e.preventDefault();
+      placeGhost(drag.x, drag.y);
+      markOver(slotAt(drag.x, drag.y));
+      if (drag.y < 80) window.scrollBy(0, -9);
+      else if (drag.y > window.innerHeight - 80) window.scrollBy(0, 9);
+    }, { passive: false });
+
+    window.addEventListener('pointerup', function (e) {
+      if (!drag || e.pointerId !== drag.id) return;
+      endDrag(true);
+    });
+    window.addEventListener('pointercancel', function (e) {
+      if (!drag || e.pointerId !== drag.id) return;
+      endDrag(false);
     });
   }
 
@@ -2302,7 +2388,7 @@ subtle,微妙的"></textarea>
     });
     $('albSend').addEventListener('click', sendAlbum);
     $('albDel').addEventListener('click', deleteAlbum);
-    $('albMove').addEventListener('click', moveAlbum);
+    bindDrag();
     $('albRefresh').addEventListener('click', albumQuery);
     $('clearMeals').addEventListener('click', clearMeals);
     $('wallRead').addEventListener('click', function () {
