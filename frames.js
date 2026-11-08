@@ -215,6 +215,13 @@
       return frame([26, index]);
     },
 
+    // [27][from][to] 把第 from 张挪到第 to 张(0 起)。只改目录顺序,不搬照片,
+    // 所以不管挪多远都是一瞬间。回执是 "MOVE OK" / "MOVE ERR"。
+    albumMove: function (from, to) {
+      if (from < 0 || from >= 31 || to < 0 || to >= 31) throw new Error('第几张 0..30');
+      return frame([27, from, to]);
+    },
+
     // CRC32,与固件的 esp_rom_crc32_le(0, ...) 实测一致 —— 也就是标准 zlib CRC32:
     // 反射多项式 0xEDB88320,计算前后各取反一次。
     crc32: function (bytes, seed) {

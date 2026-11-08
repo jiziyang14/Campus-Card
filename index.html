@@ -199,7 +199,16 @@
     background: #FBF0EC; border: 1px solid rgba(181,80,47,.25);
   }
   .delbar[hidden] { display: none; }
-  .delbar span { flex: 1; font-size: 13px; color: var(--red); }
+  .delbar span { flex: 0 0 auto; font-size: 13px; color: var(--red); }
+  .delbar .movebox {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 12px; color: var(--muted); white-space: nowrap;
+  }
+  .delbar .movebox input {
+    width: 52px; padding: 4px 6px; font: inherit; font-size: 12px;
+    border: 1px solid var(--rule); border-radius: 7px;
+    background: #fff; color: var(--ink);
+  }
 
   /* ---------------------------------------------------------------- 表单 */
   textarea {
@@ -413,7 +422,10 @@
         <div class="slots" id="albSlots"></div>
 
         <div class="delbar" id="albDelBar" hidden>
-          <span id="albDelText">删除第 1 张？</span>
+          <span id="albDelText">第 1 张</span>
+          <label class="movebox">移到第
+            <input id="albMoveNo" type="number" min="1" value="1"> 张</label>
+          <button id="albMove" class="btn sm" disabled>移动</button>
           <button id="albDel" class="btn danger sm" disabled>删除</button>
           <button id="albCancel" class="btn ghost sm">取消</button>
         </div>
@@ -806,6 +818,7 @@ subtle,微妙的"></textarea>
     $('bgClear').disabled = !on;
     $('albSend').disabled = !on || !albBits;
     $('albDel').disabled = !on || !(albCount > 0);
+    $('albMove').disabled = !on || !(albCount > 1);
     $('albRefresh').disabled = !on;
     $('clearMeals').disabled = !on;
     $('wallRead').disabled = !on;
@@ -1749,6 +1762,7 @@ subtle,微妙的"></textarea>
     }
     $('albMeta').textContent = albCount + ' / ' + CardFrames.ALBUM_MAX + ' 张';
     $('albDelNo').max = String(Math.max(1, albCount));
+    $('albMoveNo').max = String(Math.max(1, albCount));
     renderAlbumSlots();
   }
 
@@ -1776,7 +1790,7 @@ subtle,微妙的"></textarea>
     $('albMeter').style.width = (n / max * 100).toFixed(1) + '%';
     $('albSlotHint').textContent = albCount < 0
       ? '先点「读取卡片里现有照片」'
-      : (n === 0 ? '卡片里还没有照片' : '点一格选中，再确认删除');
+      : (n === 0 ? '卡片里还没有照片' : '点一格选中，可以换位置或删掉');
   }
 
   function selectAlbumSlot(no) {
@@ -1785,9 +1799,11 @@ subtle,微妙的"></textarea>
       cells[i].classList.toggle('sel', cells[i].dataset.no === no);
     }
     $('albDelNo').value = no;
-    $('albDelText').textContent = '删除第 ' + no + ' 张？删掉后剩下的不挪位置。';
+    $('albMoveNo').value = no;
+    $('albDelText').textContent = '第 ' + no + ' 张';
     $('albDelBar').hidden = false;
     $('albDel').disabled = !(rx && !busy);
+    $('albMove').disabled = !(rx && !busy) || !(albCount > 1);
   }
 
   function clearAlbumSel() {
@@ -1914,6 +1930,24 @@ subtle,微妙的"></textarea>
         log('照片写进去了，卡上「相册」最后一张就是它。', 'ok');
         $('albHint').textContent = '传完了。要换一张，再选一张重发就行。';
       }
+    });
+  }
+
+  function moveAlbum() {
+    return guard(async function () {
+      if (!(albCount > 1)) return log('至少两张才谈得上换位置。', 'bad');
+      var from = parseInt($('albDelNo').value, 10);
+      var to = parseInt($('albMoveNo').value, 10);
+      if (!(from >= 1 && from <= albCount) || !(to >= 1 && to <= albCount)) {
+        return log('位置要在 1..' + albCount + ' 之间。', 'bad');
+      }
+      if (from === to) return log('它本来就在第 ' + to + ' 张。', 'bad');
+      await sendFrames([CardFrames.albumMove(from - 1, to - 1)]);
+      // 卡片只改目录、不搬照片,写完索引就回 "MOVE OK",稍等一下再问总数。
+      await new Promise(function (r) { setTimeout(r, 250); });
+      await albumQueryRaw();
+      clearAlbumSel();
+      log('第 ' + from + ' 张挪到了第 ' + to + ' 张。卡片上照片数据没动，只是顺序变了。', 'ok');
     });
   }
 
@@ -2268,6 +2302,7 @@ subtle,微妙的"></textarea>
     });
     $('albSend').addEventListener('click', sendAlbum);
     $('albDel').addEventListener('click', deleteAlbum);
+    $('albMove').addEventListener('click', moveAlbum);
     $('albRefresh').addEventListener('click', albumQuery);
     $('clearMeals').addEventListener('click', clearMeals);
     $('wallRead').addEventListener('click', function () {
