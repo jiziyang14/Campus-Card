@@ -215,16 +215,15 @@
       return frame([26, index]);
     },
 
-    // CRC32,和固件的 esp_rom_crc32_le(0, ...) 逐位一致:
-    // 反射多项式 0xEDB88320,初值 0,**末尾不做异或**。
-    // 注意它不是 zlib 的 crc32 —— 那个初值和末尾都取反,算出来不一样。
+    // CRC32,与固件的 esp_rom_crc32_le(0, ...) 实测一致 —— 也就是标准 zlib CRC32:
+    // 反射多项式 0xEDB88320,计算前后各取反一次。
     crc32: function (bytes, seed) {
-      var c = (seed || 0) >>> 0;
+      var c = ((seed || 0) ^ 0xFFFFFFFF) >>> 0;
       for (var i = 0; i < bytes.length; i++) {
         c ^= bytes[i];
         for (var k = 0; k < 8; k++) c = (c >>> 1) ^ ((c & 1) ? 0xEDB88320 : 0);
       }
-      return c >>> 0;
+      return (c ^ 0xFFFFFFFF) >>> 0;
     },
 
     // RGBA → RGB565 小端。屏幕驱动开了 swap_bytes,所以这里按 LVGL 的原生
